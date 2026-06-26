@@ -1,6 +1,6 @@
 # Media Downloader
 
-An open-source Android app for downloading media (video, audio, images) from 20+ social media platforms — powered by [btch-downloader](https://github.com/hostinger-bot/btch-downloader).
+An open-source Android app for downloading media (video, audio, images) from 20+ social media platforms — powered by [btch-dl](https://github.com/hostinger-bot/btch-dl.git).
 
 ## Features
 
