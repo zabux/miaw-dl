@@ -69,8 +69,8 @@ private val platforms = listOf(
     "capcut"            to "CapCut",
     "gdrive"            to "Google Drive",
     "pinterest"         to "Pinterest",
-    "xiaohongshu"       to "Xiaohongshu",
-    "xiaohongshuProfile" to "Xiaohongshu Profile",
+    "rednote"            to "Xiaohongshu",
+    "rednote-profile"    to "Xiaohongshu Profile",
     "douyin"            to "Douyin",
     "snackvideo"        to "SnackVideo",
     "cocofun"           to "Cocofun",
@@ -136,7 +136,7 @@ private val platformPatterns = listOf(
     Regex("""drive\.google\.com""") to "gdrive",
     Regex("""pinterest\.com|pin\.it""") to "pinterest",
     Regex("""xiaohongshu\.com|xhslink\.com""") to { url: String, path: String ->
-        if ("/user/" in path || "/profile/" in path) "xiaohongshuProfile" else "xiaohongshu"
+        if ("/user/" in path || "/profile/" in path) "rednote-profile" else "rednote"
     },
     Regex("""kuaishou(app)?\.com""") to "kuaishou",
     Regex("""snackvideo\.com|sck\.io""") to "snackvideo",
@@ -475,7 +475,7 @@ private fun PlatformSpecificContent(platform: String, element: JsonObject, conte
                 RenderRow("Image", res["image"]?.asString())
             }
         }
-        "xiaohongshu", "rednote" -> {
+        "rednote" -> {
             RenderText("Title", payload["title"])
             RenderText("Description", payload["desc"])
             RenderText("Duration", payload["duration"])
@@ -499,7 +499,7 @@ private fun PlatformSpecificContent(platform: String, element: JsonObject, conte
                 RenderRow("Image ${i+1}", img.asString())
             }
         }
-        "xiaohongshuProfile", "rednoteProfile" -> {
+        "rednote-profile" -> {
             val user = payload["user"]?.asObject()
             if (user != null) {
                 RenderText("Nickname", user["nickname"])

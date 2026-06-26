@@ -15,6 +15,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Prepare gradle.properties for CI
+        run: sed -i '/aapt2FromMavenOverride/d' gradle.properties
+
       - name: Build APK
         run: ./gradlew :app:assembleDebug
 

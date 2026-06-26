@@ -106,11 +106,11 @@ public class BtchDownloader(
     public suspend fun pinterest(query: String): PinterestResponse = fetch("pinterest", query)
 
     /** Xiaohongshu (小红书) note downloader. */
-    public suspend fun xiaohongshu(url: String): XiaohongshuResponse = fetch("xiaohongshu", url)
+    public suspend fun rednote(url: String): RednoteResponse = fetch("rednote", url)
 
     /** Xiaohongshu (小红书) user profile metadata. */
-    public suspend fun xiaohongshuProfile(url: String): XiaohongshuProfileResponse =
-        fetch("xiaohongshu_profile", url)
+    public suspend fun rednoteProfile(url: String): RednoteProfileResponse =
+        fetch("rednote-profile", url)
 
     /** Douyin (抖音) video/image downloader. */
     public suspend fun douyin(url: String): DouyinResponse = fetch("douyin", url)

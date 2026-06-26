@@ -254,8 +254,7 @@ public data class XHSNoteResult(
     val downloads: List<XHSDownloadLink>? = null,
 )
 
-@Serializable
-public data class XiaohongshuResponse(
+public data class RednoteResponse(
     public val status: Boolean? = null,
     public val developer: String? = null,
     public val message: String? = null,
@@ -263,8 +262,7 @@ public data class XiaohongshuResponse(
     public val code: Int? = null,
     public val result: XHSNoteResult? = null,
 )
-
-// ── Xiaohongshu Profile ───────────────────────────────────────────────────
+// ── Rednote Profile ───────────────────────────────────────────────────
 
 @Serializable
 public data class XHSProfileUser(
@@ -313,8 +311,7 @@ public data class XHSProfileResult(
 )
 
 @Serializable
-public data class XiaohongshuProfileResponse(
-    public val status: Boolean? = null,
+public data class RednoteProfileResponse(
     public val developer: String? = null,
     public val message: String? = null,
     public val note: String? = null,
