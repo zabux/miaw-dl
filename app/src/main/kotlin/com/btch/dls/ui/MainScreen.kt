@@ -149,10 +149,22 @@ private val platformPatterns = listOf(
     Regex("""mediafire\.com""") to "mediafire",
 )
 
+private fun extractUrl(text: String): String {
+    val regex = Regex("""https?://[^\s]+""", RegexOption.IGNORE_CASE)
+    val match = regex.find(text) ?: return text
+    var url = match.value.trim()
+    val trailingPunct = setOf('.', ',', '!', '?', ')', ']', '}')
+    while (url.isNotEmpty() && url.last() in trailingPunct) {
+        url = url.substring(0, url.length - 1)
+    }
+    return url
+}
+
 private fun autoDetectPlatform(url: String): String? {
     if (url.isBlank()) return null
-    val lowerUrl = url.lowercase()
-    val path = try { android.net.Uri.parse(url).path?.lowercase() ?: "" } catch (e: Exception) { "" }
+    val targetUrl = extractUrl(url)
+    val lowerUrl = targetUrl.lowercase()
+    val path = try { android.net.Uri.parse(targetUrl).path?.lowercase() ?: "" } catch (e: Exception) { "" }
     
     for ((pattern, platform) in platformPatterns) {
         if (pattern.containsMatchIn(lowerUrl)) {
@@ -191,6 +203,7 @@ private fun downloadExt(url: String): String = when {
     ".png" in url -> "png"
     ".mov" in url -> "mov"
     ".webm" in url -> "webm"
+    "sns-webpic" in url || "xhscdn" in url || "avatar" in url || "cover" in url || "douyinpic" in url || "image" in url || "thumb" in url || "pic" in url -> "jpg"
     else -> "mp4"
 }
 private fun sanitizeFilename(name: String): String {
@@ -807,13 +820,16 @@ fun MainScreen() {
                                     if (url.isBlank()) return@Button
                                     loading = true; result = null; error = null
                                     scope.launch {
-                                        try { result = api.raw(selectedPlatform, url) }
+                                        try {
+                                            val targetUrl = if (isSearch) url else extractUrl(url)
+                                            result = api.raw(selectedPlatform, targetUrl)
+                                        }
                                         catch (e: Exception) { error = e.message ?: "Failed to fetch data" }
                                         finally { loading = false }
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().height(44.dp),
-                                enabled = !loading && (isSearch && url.isNotBlank() || isUrl(url.trim())),
+                                enabled = !loading && (isSearch && url.isNotBlank() || isUrl(extractUrl(url))),
                                 shape = CircleShape
                             ) {
                                 Icon(
