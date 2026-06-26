@@ -514,6 +514,10 @@ public data class ThreadsResponse(
     public val message: String? = null,
     public val note: String? = null,
     public val code: Int? = null,
+    public val type: String? = null,
+    public val image: String? = null,
+    public val video: String? = null,
+    public val download: String? = null,
     public val result: ThreadsResult? = null,
 )
 

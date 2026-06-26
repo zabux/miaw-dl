@@ -146,7 +146,7 @@ private val platformPatterns = listOf(
     Regex("""\b(icocofun\.com|cocofun\.com)\b""") to "cocofun",
     Regex("""\b(spotify\.com|spotify\.link)\b""") to "spotify",
     Regex("""\b(soundcloud\.com)\b""") to "soundcloud",
-    Regex("""\b(threads\.net)\b""") to "threads",
+    Regex("""\b(threads\.(net|com))\b""") to "threads",
     Regex("""\b(mediafire\.com)\b""") to "mediafire",
 )
 
@@ -827,7 +827,10 @@ fun MainScreen() {
                                     loading = true; result = null; error = null
                                     scope.launch {
                                         try {
-                                            val targetUrl = if (isSearch) url else extractUrl(url)
+                                            var targetUrl = if (isSearch) url else extractUrl(url)
+                                            if (selectedPlatform == "threads") {
+                                                targetUrl = targetUrl.replace("threads.net", "threads.com")
+                                            }
                                             result = api.raw(selectedPlatform, targetUrl)
                                         }
                                         catch (e: Exception) { error = e.message ?: "Failed to fetch data" }
