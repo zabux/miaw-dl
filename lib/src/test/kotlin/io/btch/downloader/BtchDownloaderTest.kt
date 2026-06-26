@@ -142,25 +142,25 @@ class BtchDownloaderTest {
     // ── Xiaohongshu ───────────────────────────────────────────────────────
 
     @Test
-    fun `xiaohongshu returns XiaohongshuResponse`() = runTest {
+    fun `rednote returns RednoteResponse`() = runTest {
         val client = mockClient("""
             {"developer":"test","status":true,"result":{"noteId":"abc","title":"XHS Post","desc":"desc"}}
         """.trimIndent())
 
-        val res = client.xiaohongshu("http://xhslink.com/abc")
+        val res = client.rednote("http://xhslink.com/abc")
         assertEquals("XHS Post", res.result?.title)
     }
 
     // ── Xiaohongshu Profile ───────────────────────────────────────────────
 
     @Test
-    fun `xiaohongshuProfile returns profile`() = runTest {
+    fun `rednoteProfile returns profile`() = runTest {
         val client = mockClient("""
-            {"developer":"test","status":true,"result":{"user":{"nickname":"User123","followerCount":100}}}
+            {"developer":"test","status":true,"user":{"nickname":"User123","followerCount":100}}
         """.trimIndent())
 
-        val res = client.xiaohongshuProfile("https://www.xiaohongshu.com/user/profile/abc")
-        assertEquals("User123", res.result?.user?.nickname)
+        val res = client.rednoteProfile("https://www.xiaohongshu.com/user/profile/abc")
+        assertEquals("User123", res.user?.nickname)
     }
 
     // ── Douyin ────────────────────────────────────────────────────────────

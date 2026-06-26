@@ -254,6 +254,7 @@ public data class XHSNoteResult(
     val downloads: List<XHSDownloadLink>? = null,
 )
 
+@Serializable
 public data class RednoteResponse(
     public val status: Boolean? = null,
     public val developer: String? = null,
@@ -301,22 +302,18 @@ public data class XHSPagination(
     val nextCursor: String? = null,
 )
 
-@Serializable
-public data class XHSProfileResult(
-    val status: Boolean? = null,
-    val user: XHSProfileUser? = null,
-    val stats: XHSProfileStats? = null,
-    val notes: List<XHSProfileNote>? = null,
-    val pagination: XHSPagination? = null,
-)
 
 @Serializable
 public data class RednoteProfileResponse(
+    public val status: Boolean? = null,
     public val developer: String? = null,
     public val message: String? = null,
     public val note: String? = null,
     public val code: Int? = null,
-    public val result: XHSProfileResult? = null,
+    public val user: XHSProfileUser? = null,
+    public val stats: XHSProfileStats? = null,
+    public val notes: List<XHSProfileNote>? = null,
+    public val pagination: XHSPagination? = null,
 )
 
 // ── Douyin ────────────────────────────────────────────────────────────────

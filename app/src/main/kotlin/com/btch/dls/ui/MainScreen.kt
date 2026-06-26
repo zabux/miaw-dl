@@ -173,6 +173,12 @@ private fun extractThumbnail(obj: JsonObject): String? {
         val el = payload[key]
         if (el is JsonPrimitive && el.isString && isUrl(el.content)) return el.content
     }
+    // Fallback: if 'images' exists and is an array, use the first image as thumbnail
+    val images = payload["images"]?.asArray()
+    if (images != null && images.isNotEmpty()) {
+        val first = images.firstOrNull()
+        if (first is JsonPrimitive && first.isString && isUrl(first.content)) return first.content
+    }
     return null
 }
 
@@ -185,9 +191,27 @@ private fun downloadExt(url: String): String = when {
     ".webm" in url -> "webm"
     else -> "mp4"
 }
-private fun saveFile(context: Context, url: String): Long {
+private fun sanitizeFilename(name: String): String {
+    val clean = name.replace(Regex("[\\\\/:*?\"<>|\\s\\p{Cntrl}]+"), "_")
+        .replace(Regex("_+"), "_")
+        .trim('_')
+    val maxLen = 120
+    val finalName = if (clean.length > maxLen) {
+        clean.substring(0, maxLen).trim('_')
+    } else {
+        clean
+    }
+    return finalName.ifEmpty { "media" }
+}
+
+private fun saveFile(context: Context, url: String, suggestedName: String? = null): Long {
     val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-    val name = "btch_${System.currentTimeMillis()}.${downloadExt(url)}"
+    val ext = downloadExt(url)
+    val name = if (!suggestedName.isNullOrBlank()) {
+        "${sanitizeFilename(suggestedName)}.$ext"
+    } else {
+        "btch_${System.currentTimeMillis()}.$ext"
+    }
     val request = DownloadManager.Request(Uri.parse(url))
         .setTitle(name)
         .setDescription("Downloading...")
@@ -298,13 +322,16 @@ private fun MediaDownloadRow(label: String, url: String, onDownload: () -> Long)
 }
 
 @Composable
-private fun ContentField(key: String, value: JsonElement, context: Context) {
+private fun ContentField(key: String, value: JsonElement, context: Context, suggestedNamePrefix: String? = null) {
     if (key in metaKeys) return
     when (value) {
         is JsonPrimitive -> when {
             value.isString -> {
                 val s = value.content
-                if (isUrl(s)) MediaDownloadRow(label = key, url = s, onDownload = { saveFile(context, s) })
+                if (isUrl(s)) {
+                    val suggestedName = if (!suggestedNamePrefix.isNullOrBlank()) "${suggestedNamePrefix}_$key" else null
+                    MediaDownloadRow(label = key, url = s, onDownload = { saveFile(context, s, suggestedName) })
+                }
                 else LabeledTextRow(key = key, value = s)
             }
             value.booleanOrNull != null -> {} // skip booleans
@@ -317,7 +344,8 @@ private fun ContentField(key: String, value: JsonElement, context: Context) {
                 value.forEachIndexed { i, el ->
                     val u = el.jsonPrimitive.content
                     val label = if (value.size > 1) "$key ${i + 1}" else key
-                    MediaDownloadRow(label = label, url = u, onDownload = { saveFile(context, u) })
+                    val suggestedName = if (!suggestedNamePrefix.isNullOrBlank()) "${suggestedNamePrefix}_$label" else null
+                    MediaDownloadRow(label = label, url = u, onDownload = { saveFile(context, u, suggestedName) })
                 }
             }
         }
@@ -366,10 +394,18 @@ private fun ThumbnailCard(url: String?) {
 private fun PlatformSpecificContent(platform: String, element: JsonObject, context: Context, onYtDownload: (String) -> Unit = {}) {
     val payload = element["result"]?.asObject() ?: element["data"]?.asObject() ?: element["res_data"]?.asObject() ?: element
 
+    val title = payload["title"]?.asString()
+        ?: payload["filename"]?.asString()
+        ?: payload["caption"]?.asString()
+        ?: payload["topic"]?.asString()
+        ?: payload["description"]?.asString()
+        ?: payload["desc"]?.asString()
+
     @Composable
     fun RenderRow(label: String, url: String?) {
         if (url != null && isUrl(url)) {
-            MediaDownloadRow(label, url, { saveFile(context, url) })
+            val suggestedName = if (!title.isNullOrBlank()) "${title}_$label" else null
+            MediaDownloadRow(label, url, { saveFile(context, url, suggestedName) })
         }
     }
 
@@ -496,7 +532,10 @@ private fun PlatformSpecificContent(platform: String, element: JsonObject, conte
                 RenderRow(q, obj["url"]?.asString())
             }
             payload["images"]?.asArray()?.forEachIndexed { i, img ->
-                RenderRow("Image ${i+1}", img.asString())
+                val imgUrl = img.asString()
+                ThumbnailCard(imgUrl)
+                RenderRow("Image ${i+1}", imgUrl)
+                Spacer(Modifier.height(8.dp))
             }
         }
         "rednote-profile" -> {
@@ -842,15 +881,22 @@ fun MainScreen() {
                                             val obj = el.asObject()
                                             if (obj != null) {
                                                 ThumbnailCard(extractThumbnail(obj))
+                                                val title = obj["title"]?.asString()
+                                                    ?: obj["filename"]?.asString()
+                                                    ?: obj["caption"]?.asString()
+                                                    ?: obj["topic"]?.asString()
+                                                    ?: obj["description"]?.asString()
+                                                    ?: obj["desc"]?.asString()
                                                 val url = obj["url"]?.asString()
                                                 if (url != null && isUrl(url)) {
                                                     Spacer(Modifier.height(8.dp))
-                                                    MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url) })
+                                                    val suggestedName = if (!title.isNullOrBlank()) "${title}_Media_${idx + 1}" else null
+                                                    MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url, suggestedName) })
                                                 }
                                                 val entries = obj.entries.filter { (k, _) -> k !in metaKeys && k != "url" }
                                                 if (entries.isNotEmpty()) {
                                                     Spacer(Modifier.height(8.dp))
-                                                    entries.forEach { (k, v) -> ContentField(k, v, context) }
+                                                    entries.forEach { (k, v) -> ContentField(k, v, context, title) }
                                                 }
                                             } else {
                                                 val url = el.asString()
