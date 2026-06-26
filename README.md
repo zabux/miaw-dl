@@ -16,11 +16,11 @@ An open-source Android app for downloading media (video, audio, images) from 20+
 ### Android App (APK)
 
 **Option 1 — Download APK**
-Grab the latest APK from [Releases](https://github.com/username/repo/releases) and install it on your device.
+Grab the latest APK from [Releases](https://github.com/hostinger-bot/btch-dl/releases) and install it on your device.
 
 **Option 2 — Build from source**
 ```bash
-git clone https://github.com/username/repo.git
+git clone https://github.com/hostinger-bot/btch-dl.git
 cd repo
 ./gradlew :app:assembleDebug
 # APK is at app/build/outputs/apk/debug/app-debug.apk
