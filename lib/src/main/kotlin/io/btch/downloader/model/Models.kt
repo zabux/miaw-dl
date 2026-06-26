@@ -340,6 +340,7 @@ public data class DouyinResponse(
     public val note: String? = null,
     public val code: Int? = null,
     public val result: DouyinResult? = null,
+    public val data: DouyinResult? = null,
 )
 
 // ── SnackVideo ────────────────────────────────────────────────────────────

@@ -122,8 +122,10 @@ private fun JsonObject.withoutMeta(): List<Map.Entry<String, JsonElement>> =
     entries.filter { it.key !in metaKeys }
 
 
-private fun JsonElement?.asString(): String? =
-    if (this is JsonPrimitive && this.isString) this.content else null
+private fun JsonElement?.asString(): String? {
+    val s = if (this is JsonPrimitive && this.isString) this.content else null
+    return s?.replace("&amp;", "&")
+}
 
 private val platformPatterns = listOf(
     Regex("""tiktok\.(com|v)""") to "ttdl",
@@ -132,7 +134,7 @@ private val platformPatterns = listOf(
     Regex("""twitter\.com|x\.com|t\.co""") to "twitter",
     Regex("""youtube\.com|youtu\.be""") to "youtube",
     Regex("""facebook\.com|fb\.watch|fb\.gg|fb\.me""") to "fbdown",
-    Regex("""capcut\.(com|net)""") to "capcut",
+    Regex("""capcut""") to "capcut",
     Regex("""drive\.google\.com""") to "gdrive",
     Regex("""pinterest\.com|pin\.it""") to "pinterest",
     Regex("""xiaohongshu\.com|xhslink\.com""") to { url: String, path: String ->
@@ -171,13 +173,13 @@ private fun extractThumbnail(obj: JsonObject): String? {
     val payload = obj["result"]?.asObject() ?: obj["data"]?.asObject() ?: obj
     for (key in thumbnailKeys) {
         val el = payload[key]
-        if (el is JsonPrimitive && el.isString && isUrl(el.content)) return el.content
+        if (el is JsonPrimitive && el.isString && isUrl(el.content)) return el.content.replace("&amp;", "&")
     }
     // Fallback: if 'images' exists and is an array, use the first image as thumbnail
     val images = payload["images"]?.asArray()
     if (images != null && images.isNotEmpty()) {
         val first = images.firstOrNull()
-        if (first is JsonPrimitive && first.isString && isUrl(first.content)) return first.content
+        if (first is JsonPrimitive && first.isString && isUrl(first.content)) return first.content.replace("&amp;", "&")
     }
     return null
 }
@@ -205,14 +207,15 @@ private fun sanitizeFilename(name: String): String {
 }
 
 private fun saveFile(context: Context, url: String, suggestedName: String? = null): Long {
+    val cleanUrl = url.replace("&amp;", "&")
     val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-    val ext = downloadExt(url)
+    val ext = downloadExt(cleanUrl)
     val name = if (!suggestedName.isNullOrBlank()) {
         "${sanitizeFilename(suggestedName)}.$ext"
     } else {
         "btch_${System.currentTimeMillis()}.$ext"
     }
-    val request = DownloadManager.Request(Uri.parse(url))
+    val request = DownloadManager.Request(Uri.parse(cleanUrl))
         .setTitle(name)
         .setDescription("Downloading...")
         .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -541,20 +544,45 @@ private fun PlatformSpecificContent(platform: String, element: JsonObject, conte
         "rednote-profile" -> {
             val user = payload["user"]?.asObject()
             if (user != null) {
+                val avatar = user["avatar"]?.asString()
+                if (avatar != null && isUrl(avatar)) {
+                    ThumbnailCard(avatar)
+                    Spacer(Modifier.height(8.dp))
+                }
                 RenderText("Nickname", user["nickname"])
                 RenderText("Red ID", user["redId"])
                 RenderText("Bio", user["bio"])
                 RenderText("IP Location", user["ipLocation"])
+                val genderVal = when (user["gender"]?.asString() ?: user["gender"]?.toString()) {
+                    "1", "1.0" -> "Male"
+                    "2", "2.0" -> "Female"
+                    else -> null
+                }
+                if (genderVal != null) {
+                    RenderText("Gender", JsonPrimitive(genderVal))
+                }
+                if (user["verified"]?.asString() == "true" || user["verified"]?.toString() == "true") {
+                    RenderText("Verified", JsonPrimitive("Yes"))
+                }
             }
             val stats = payload["stats"]?.asObject()
             if (stats != null) {
-                RenderText("Notes", stats["notes"])
+                RenderText("Followers", stats["followers"])
+                RenderText("Following", stats["followings"])
+                RenderText("Likes", stats["likes"])
+                RenderText("Notes Count", stats["notes"])
             }
             payload["notes"]?.asArray()?.forEachIndexed { i, el ->
                 val obj = el.asObject() ?: return@forEachIndexed
                 RenderText("Note ${i+1} Title", obj["title"])
                 RenderText("Note ${i+1} Likes", obj["likes"])
-                RenderRow("Note ${i+1} Cover", obj["cover"]?.asString())
+                val cover = obj["cover"]?.asString()
+                if (cover != null && isUrl(cover)) {
+                    ThumbnailCard(cover)
+                    Spacer(Modifier.height(8.dp))
+                }
+                RenderRow("Note ${i+1} Cover", cover)
+                Spacer(Modifier.height(8.dp))
             }
         }
         "douyin" -> {
