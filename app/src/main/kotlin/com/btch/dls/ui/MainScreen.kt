@@ -128,25 +128,25 @@ private fun JsonElement?.asString(): String? {
 }
 
 private val platformPatterns = listOf(
-    Regex("""tiktok\.(com|v)""") to "ttdl",
-    Regex("""douyin\.com|iesdouyin\.com""") to "douyin",
-    Regex("""instagram\.com|ig\.me""") to "igdl",
-    Regex("""twitter\.com|x\.com|t\.co""") to "twitter",
-    Regex("""youtube\.com|youtu\.be""") to "youtube",
-    Regex("""facebook\.com|fb\.watch|fb\.gg|fb\.me""") to "fbdown",
+    Regex("""\b(tiktok\.(com|v))\b""") to "ttdl",
+    Regex("""\b(douyin\.com|iesdouyin\.com)\b""") to "douyin",
+    Regex("""\b(instagram\.com|ig\.me)\b""") to "igdl",
+    Regex("""\b(twitter\.com|x\.com|t\.co)\b""") to "twitter",
+    Regex("""\b(youtube\.com|youtu\.be)\b""") to "youtube",
+    Regex("""\b(facebook\.com|fb\.watch|fb\.gg|fb\.me)\b""") to "fbdown",
     Regex("""capcut""") to "capcut",
-    Regex("""drive\.google\.com""") to "gdrive",
-    Regex("""pinterest\.com|pin\.it""") to "pinterest",
-    Regex("""xiaohongshu\.com|xhslink\.com""") to { url: String, path: String ->
+    Regex("""\b(drive\.google\.com)\b""") to "gdrive",
+    Regex("""\b(pinterest\.com|pin\.it)\b""") to "pinterest",
+    Regex("""\b(xiaohongshu\.com|xhslink\.com)\b""") to { url: String, path: String ->
         if ("/user/" in path || "/profile/" in path) "rednote-profile" else "rednote"
     },
-    Regex("""kuaishou(app)?\.com""") to "kuaishou",
-    Regex("""snackvideo\.com|sck\.io""") to "snackvideo",
-    Regex("""icocofun\.com|cocofun\.com""") to "cocofun",
-    Regex("""spotify\.com|spotify\.link""") to "spotify",
-    Regex("""soundcloud\.com""") to "soundcloud",
-    Regex("""threads\.net""") to "threads",
-    Regex("""mediafire\.com""") to "mediafire",
+    Regex("""\b(kuaishou(app)?\.com)\b""") to "kuaishou",
+    Regex("""\b(snackvideo\.com|sck\.io)\b""") to "snackvideo",
+    Regex("""\b(icocofun\.com|cocofun\.com)\b""") to "cocofun",
+    Regex("""\b(spotify\.com|spotify\.link)\b""") to "spotify",
+    Regex("""\b(soundcloud\.com)\b""") to "soundcloud",
+    Regex("""\b(threads\.net)\b""") to "threads",
+    Regex("""\b(mediafire\.com)\b""") to "mediafire",
 )
 
 private fun extractUrl(text: String): String {
