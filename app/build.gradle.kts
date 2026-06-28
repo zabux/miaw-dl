@@ -13,11 +13,20 @@ android {
         applicationId = "dl.miaw"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.2.6"
+        versionCode = 9
+        versionName = "1.2.7"
     }
     buildFeatures {
         compose = true
+    }
+    
+    signingConfigs {
+        create("release") {
+            storeFile = file("keystore.jks")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     kotlinOptions {
@@ -32,7 +41,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
