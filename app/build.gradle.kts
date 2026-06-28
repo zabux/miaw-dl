@@ -13,8 +13,8 @@ android {
         applicationId = "dl.miaw"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.2.9"
+        versionCode = 12
+        versionName = "1.3.0"
     }
     buildFeatures {
         compose = true
@@ -50,6 +50,9 @@ dependencies {
     implementation(project(":lib"))
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.serialization.json)
+    
+    // Mixpanel Analytics
+    implementation("com.mixpanel.android:mixpanel-android:7.5.4")
 
     // Compose
     implementation(platform(libs.compose.bom))

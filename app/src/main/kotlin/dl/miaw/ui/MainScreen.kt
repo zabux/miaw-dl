@@ -61,6 +61,7 @@ import compose.icons.fontawesomeicons.solid.Download
 import compose.icons.fontawesomeicons.solid.Search
 import dl.miaw.utils.UpdateManager
 import dl.miaw.utils.UpdateInfo
+import dl.miaw.utils.AnalyticsManager
 
 private val platforms = listOf(
     "ttdl"              to "TikTok",
@@ -345,6 +346,7 @@ private fun MediaDownloadRow(label: String, url: String, onDownload: suspend () 
                 } else {
                     Button(
                         onClick = { 
+                            AnalyticsManager.trackEvent("Download_Media", mapOf("type" to type))
                             scope.launch { 
                                 isPreparing = true
                                 val id = onDownload()
@@ -869,6 +871,7 @@ fun MainScreen() {
                             Button(
                                 onClick = {
                                     if (url.isBlank()) return@Button
+                                    AnalyticsManager.trackEvent("Fetch_Media", mapOf("platform" to selectedPlatform))
                                     loading = true; result = null; error = null
                                     scope.launch {
                                         try {
@@ -1075,6 +1078,9 @@ fun MainScreen() {
             }
         }
         updateInfo?.let { info ->
+            LaunchedEffect(info.version) {
+                AnalyticsManager.trackEvent("Update_Prompted", mapOf("version" to info.version))
+            }
             UpdateDialog(info = info, onDismiss = { updateInfo = null })
         }
     }
@@ -1105,6 +1111,7 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
             if (!isDownloading) {
                 Button(onClick = {
                     isDownloading = true
+                    AnalyticsManager.trackEvent("Update_Started", mapOf("version" to info.version))
                     scope.launch {
                         UpdateManager.downloadAndInstall(context, info.downloadUrl) { p -> progress = p }
                         if (progress < 0f) {
