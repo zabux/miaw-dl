@@ -1,77 +1,80 @@
 # Media Downloader
 
-An open-source Android app for downloading media (video, audio, images) from 20+ social media platforms — powered by [btch-dl](https://github.com/hostinger-bot/btch-dl.git).
+Aplikasi Android sumber terbuka untuk mengunduh media (video, audio, dan gambar) dari lebih dari 20 platform media sosial — didukung oleh **miaw-dl**.
 
-## Features
+## Fitur
 
-- **20+ platforms**: TikTok, Instagram, Twitter/X, YouTube, Facebook, CapCut, Google Drive, Pinterest, Xiaohongshu (Rednote), Douyin, SnackVideo, Cocofun, Spotify, SoundCloud, Threads, Kuaishou, MediaFire, and more
-- **Auto-detect platform** — just paste a link
-- **Rich metadata** — title, author, duration, views, thumbnails, etc.
-- **Live download progress** — real-time progress bar (0–100%)
-- **YouTube Search** — search videos and fetch MP3/MP4 download links
-- **Dark mode**
+- **Mendukung lebih dari 20 platform**: TikTok, Instagram, Twitter/X, YouTube, Facebook, CapCut, Google Drive, Pinterest, Xiaohongshu (Rednote), Douyin, SnackVideo, Cocofun, Spotify, SoundCloud, Threads, Kuaishou, MediaFire, dan lainnya.
+- **Deteksi platform otomatis** — cukup tempelkan tautan.
+- **Metadata lengkap** — judul, penulis, durasi, jumlah tayangan, thumbnail, dan lainnya.
+- **Progres unduhan secara langsung** — bilah progres waktu nyata (0–100%).
+- **Pencarian YouTube** — cari video dan dapatkan tautan unduhan MP3/MP4.
+- **Mode gelap (Dark Mode).**
 
-## Installation
+## Instalasi
 
-### Android App (APK)
+### Aplikasi Android (APK)
 
-**Option 1 — Download APK**
-Grab the latest APK from [Releases](https://github.com/hostinger-bot/btch-dl/releases) and install it on your device.
+**Opsi 1 — Unduh APK**
 
-**Option 2 — Build from source**
+Unduh APK terbaru dari halaman **Releases** dan instal di perangkat Android Anda.
+
+**Opsi 2 — Bangun dari kode sumber**
 
 ```bash
-git clone https://github.com/hostinger-bot/btch-dl.git
-cd btch-dl
+git clone https://github.com/hostinger-bot/miaw-dl.git
+cd miaw-dl
 
-# Build Release APK (automatically signed and installable)
+# Membangun APK Rilis (ditandatangani secara otomatis dan siap dipasang)
 ./gradlew :app:assembleRelease
-# APK is generated at app/build/outputs/apk/release/app-release.apk
+# APK akan dibuat di app/build/outputs/apk/release/app-release.apk
 
-# Build Debug APK
+# Membangun APK Debug
 ./gradlew :app:assembleDebug
-# APK is generated at app/build/outputs/apk/debug/app-debug.apk
+# APK akan dibuat di app/build/outputs/apk/debug/app-debug.apk
 ```
-### Ktor Client Library (Kotlin/JVM)
 
-Add to your `build.gradle.kts`:
+### Pustaka Klien Ktor (Kotlin/JVM)
+
+Tambahkan ke file `build.gradle.kts` Anda:
 
 ```kotlin
 repositories {
     mavenCentral()
 }
+
 dependencies {
-    implementation("io.btch:btch-downloader-ktor:1.0.0")
+    implementation("io.miaw:miaw-downloader-ktor:1.0.0")
 }
 ```
 
-## Quick Start
+## Memulai dengan Cepat
 
 ```kotlin
-// Create a client
-val api = BtchDownloader()
+// Membuat klien
+val api = MiawDownloader()
 
-// Download TikTok
+// Mengunduh video TikTok
 val tiktok = api.ttdl("https://www.tiktok.com/@user/video/123")
 println(tiktok.title)
 
-// Download YouTube
+// Mengunduh video YouTube
 val youtube = api.youtube("https://youtu.be/abc123")
 println(youtube.mp4)
 
-// Search YouTube
+// Mencari video di YouTube
 val results = api.yts("cats")
 println(results.all)
 
-// Raw JSON response
+// Mendapatkan respons JSON mentah
 val raw: String = api.raw("instagram", "https://www.instagram.com/p/abc123/")
 ```
 
-### Custom Configuration
+### Konfigurasi Kustom
 
 ```kotlin
-val api = BtchDownloader(
-    BtchConfig(
+val api = MiawDownloader(
+    MiawConfig(
         baseUrl = "https://backend1.tioo.eu.org",
         timeoutMs = 30_000,
         logLevel = LogLevel.HEADERS,
@@ -79,6 +82,6 @@ val api = BtchDownloader(
 )
 ```
 
-## License
+## Lisensi
 
 MIT
