@@ -1063,10 +1063,10 @@ fun MainScreen() {
                             Text("© Powered by ", style = MaterialTheme.typography.bodySmall)
                             val uriHandler = LocalUriHandler.current
                             Text(
-                                "btch-downloader",
+                                "awy.my.id",
                                 style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.Underline),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable { uriHandler.openUri("https://github.com/hostinger-bot/btch-dl.git") }
+                                modifier = Modifier.clickable { uriHandler.openUri("https://awy.my.id") }
                             )
                         }
                         Spacer(Modifier.height(16.dp))
