@@ -741,7 +741,7 @@ fun MainScreen() {
     
     LaunchedEffect(Unit) {
         try {
-            val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName
+            val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
             updateInfo = UpdateManager.checkForUpdate(currentVersion)
         } catch (e: Exception) {
             e.printStackTrace()
