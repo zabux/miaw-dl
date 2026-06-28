@@ -1089,13 +1089,13 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = { if (!isDownloading) onDismiss() },
-        title = { Text("Update Available: v${info.version}", style = MaterialTheme.typography.titleLarge) },
+        title = { Text("Pembaruan Tersedia: v${info.version}", style = MaterialTheme.typography.titleLarge) },
         text = {
             Column {
                 Text(info.changelog, style = MaterialTheme.typography.bodySmall, maxLines = 10, overflow = TextOverflow.Ellipsis)
                 if (isDownloading) {
                     Spacer(Modifier.height(16.dp))
-                    Text("Downloading... ${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                    Text("Mengunduh... ${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(4.dp))
                     LinearProgressIndicator(progress = progress, modifier = Modifier.fillMaxWidth())
                 }
@@ -1111,12 +1111,12 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
                             isDownloading = false
                         }
                     }
-                }) { Text("Update Now") }
+                }) { Text("Perbarui Sekarang") }
             }
         },
         dismissButton = {
             if (!isDownloading) {
-                TextButton(onClick = onDismiss) { Text("Later") }
+                TextButton(onClick = onDismiss) { Text("Nanti") }
             }
         }
     )

@@ -40,9 +40,17 @@ object UpdateManager {
                         }
                     }
                     if (downloadUrl.isNotEmpty()) {
+                        val rawBody = json.optString("body", "Tidak ada catatan pembaruan.")
+                        val cleanBody = rawBody.lines()
+                            .filter { !it.contains("github.com", ignoreCase = true) }
+                            .joinToString("\n")
+                            .replace("What's Changed", "Apa yang baru:")
+                            .replace("New Contributors", "Kontributor Baru:")
+                            .trim()
+                            
                         return@withContext UpdateInfo(
                             version = tagName,
-                            changelog = json.optString("body", "No changelog provided."),
+                            changelog = cleanBody.ifEmpty { "Pembaruan sistem dan perbaikan bug." },
                             downloadUrl = downloadUrl
                         )
                     }
