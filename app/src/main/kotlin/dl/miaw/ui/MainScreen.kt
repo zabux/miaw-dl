@@ -346,7 +346,7 @@ private fun MediaDownloadRow(label: String, url: String, onDownload: suspend () 
                 } else {
                     Button(
                         onClick = { 
-                            AnalyticsManager.trackEvent("Download_Media", mapOf("type" to type))
+                            AnalyticsManager.trackEvent("Download_Media", mapOf("label" to label))
                             scope.launch { 
                                 isPreparing = true
                                 val id = onDownload()

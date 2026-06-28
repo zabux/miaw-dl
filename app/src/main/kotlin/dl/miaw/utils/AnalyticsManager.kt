@@ -9,17 +9,7 @@ object AnalyticsManager {
 
     fun init(context: Context, token: String) {
         try {
-            mixpanel = MixpanelAPI.getInstance(context, token, true) // optOutTrackingDefault=true for GDPR or just normal init? We will use standard init.
-            // Wait, MixpanelAPI.getInstance(context, token) is standard.
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    // Standard initialization without optOut param for broader compatibility
-    fun initMixpanel(context: Context, token: String) {
-        try {
-            mixpanel = MixpanelAPI.getInstance(context, token)
+            mixpanel = MixpanelAPI.getInstance(context, token, true)
         } catch (e: Exception) {
             e.printStackTrace()
         }

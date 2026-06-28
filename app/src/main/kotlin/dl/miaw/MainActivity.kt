@@ -11,7 +11,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         // Init Mixpanel Analytics
-        AnalyticsManager.initMixpanel(this, "3c21db73c2b1e4722241404604e60b54")
+        AnalyticsManager.init(this, "3c21db73c2b1e4722241404604e60b54")
         AnalyticsManager.trackEvent("App_Opened")
 
         setContent {
