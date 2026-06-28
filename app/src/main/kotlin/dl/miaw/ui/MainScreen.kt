@@ -1117,6 +1117,6 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
         dismissButton = {
             if (!isDownloading) {
                 TextButton(onClick = onDismiss) { Text("Later") }
-            }
         }
     )
+}
