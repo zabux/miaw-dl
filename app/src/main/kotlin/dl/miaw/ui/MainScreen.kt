@@ -59,6 +59,8 @@ import compose.icons.fontawesomeicons.solid.Times
 import compose.icons.fontawesomeicons.solid.Adjust
 import compose.icons.fontawesomeicons.solid.Download
 import compose.icons.fontawesomeicons.solid.Search
+import dl.miaw.utils.UpdateManager
+import dl.miaw.utils.UpdateInfo
 
 private val platforms = listOf(
     "ttdl"              to "TikTok",
@@ -735,6 +737,16 @@ fun MainScreen() {
     val api = remember { BtchDownloader() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    
+    LaunchedEffect(Unit) {
+        try {
+            val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName
+            updateInfo = UpdateManager.checkForUpdate(currentVersion)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
 
     var selectedPlatform by remember { mutableStateOf(platforms.first().first) }
@@ -1062,5 +1074,49 @@ fun MainScreen() {
                 }
             }
         }
+        updateInfo?.let { info ->
+            UpdateDialog(info = info, onDismiss = { updateInfo = null })
+        }
     }
 }
+
+@Composable
+fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
+    var isDownloading by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isDownloading) onDismiss() },
+        title = { Text("Update Available: v${info.version}", style = MaterialTheme.typography.titleLarge) },
+        text = {
+            Column {
+                Text(info.changelog, style = MaterialTheme.typography.bodySmall, maxLines = 10, overflow = TextOverflow.Ellipsis)
+                if (isDownloading) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("Downloading... ${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(4.dp))
+                    LinearProgressIndicator(progress = progress, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            if (!isDownloading) {
+                Button(onClick = {
+                    isDownloading = true
+                    scope.launch {
+                        UpdateManager.downloadAndInstall(context, info.downloadUrl) { p -> progress = p }
+                        if (progress < 0f) {
+                            isDownloading = false
+                        }
+                    }
+                }) { Text("Update Now") }
+            }
+        },
+        dismissButton = {
+            if (!isDownloading) {
+                TextButton(onClick = onDismiss) { Text("Later") }
+            }
+        }
+    )
