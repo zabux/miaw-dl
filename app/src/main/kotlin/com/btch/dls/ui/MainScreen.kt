@@ -196,16 +196,6 @@ private fun extractThumbnail(obj: JsonObject): String? {
     return null
 }
 
-private fun downloadExt(url: String): String = when {
-    ".mp4" in url -> "mp4"
-    ".mp3" in url -> "mp3"
-    ".jpg" in url || ".jpeg" in url || ".webp" in url -> "jpg"
-    ".png" in url -> "png"
-    ".mov" in url -> "mov"
-    ".webm" in url -> "webm"
-    "sns-webpic" in url || "xhscdn" in url || "avatar" in url || "cover" in url || "douyinpic" in url || "image" in url || "thumb" in url || "pic" in url -> "jpg"
-    else -> "mp4"
-}
 private fun sanitizeFilename(name: String): String {
     val clean = name.replace(Regex("[\\\\/:*?\"<>|\\s\\p{Cntrl}]+"), "_")
         .replace(Regex("_+"), "_")
@@ -219,40 +209,70 @@ private fun sanitizeFilename(name: String): String {
     return finalName.ifEmpty { "media" }
 }
 
-private fun saveFile(context: Context, url: String, suggestedName: String? = null): Long {
+private suspend fun saveFile(context: Context, url: String, suggestedName: String? = null): Long {
     val cleanUrl = url.replace("&amp;", "&")
-    val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-    val ext = downloadExt(cleanUrl)
-    val name = if (!suggestedName.isNullOrBlank()) {
-        "${sanitizeFilename(suggestedName)}.$ext"
-    } else {
-        "btch_${System.currentTimeMillis()}.$ext"
+    
+    val (guessedName, mimeType) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        var finalName = suggestedName
+        var mime: String? = null
+        try {
+            val connection = java.net.URL(cleanUrl).openConnection() as java.net.HttpURLConnection
+            connection.requestMethod = "HEAD"
+            connection.connect()
+            
+            val contentDisposition = connection.getHeaderField("Content-Disposition")
+            mime = connection.getHeaderField("Content-Type") ?: connection.contentType
+            
+            val fallback = android.webkit.URLUtil.guessFileName(cleanUrl, contentDisposition, mime)
+            if (finalName == null) {
+                finalName = fallback
+            } else if (!finalName.contains(".")) {
+                val ext = fallback.substringAfterLast('.', "")
+                if (ext.isNotEmpty()) {
+                    finalName = "$finalName.$ext"
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            if (finalName == null) {
+                finalName = android.webkit.URLUtil.guessFileName(cleanUrl, null, null)
+            }
+        }
+        Pair(finalName ?: "media_file", mime)
     }
+
+    val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    
+    val sanitizedName = sanitizeFilename(guessedName)
     val request = DownloadManager.Request(Uri.parse(cleanUrl))
-        .setTitle(name)
+        .setTitle(sanitizedName)
         .setDescription("Downloading...")
         .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
+        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, sanitizedName)
         .setAllowedOverMetered(true)
         .setAllowedOverRoaming(true)
-    return dm.enqueue(request)
+    
+    mimeType?.let { request.setMimeType(it) }
+    
+    return try {
+        dm.enqueue(request)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        -1L
+    }
 }
 
-private fun mimeOf(url: String): String = when (url.substringAfterLast(".").substringBefore("?").lowercase()) {
-    "mp4", "mov", "webm", "avi" -> "video/mp4"
-    "mp3", "aac", "m4a", "wav", "ogg" -> "audio/mpeg"
-    "jpg", "jpeg", "png", "webp" -> "image/jpeg"
-    else -> "video/mp4"
-}
 
 
 @Composable
-private fun MediaDownloadRow(label: String, url: String, onDownload: () -> Long) {
+private fun MediaDownloadRow(label: String, url: String, onDownload: suspend () -> Long) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var downloadId by remember { mutableStateOf<Long?>(null) }
     var progress by remember { mutableFloatStateOf(0f) }
     var isDownloading by remember { mutableStateOf(false) }
     var isCompleted by remember { mutableStateOf(false) }
+    var isPreparing by remember { mutableStateOf(false) }
 
     LaunchedEffect(downloadId) {
         val id = downloadId ?: return@LaunchedEffect
@@ -308,7 +328,13 @@ private fun MediaDownloadRow(label: String, url: String, onDownload: () -> Long)
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
-                if (isDownloading) {
+                if (isPreparing) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp
+                    )
+                } else if (isDownloading) {
                     Text(
                         "${(progress * 100).toInt()}%",
                         style = MaterialTheme.typography.labelMedium,
@@ -316,7 +342,14 @@ private fun MediaDownloadRow(label: String, url: String, onDownload: () -> Long)
                     )
                 } else {
                     Button(
-                        onClick = { downloadId = onDownload() },
+                        onClick = { 
+                            scope.launch { 
+                                isPreparing = true
+                                val id = onDownload()
+                                isPreparing = false
+                                if (id != -1L) downloadId = id
+                            } 
+                        },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.height(34.dp),
                         shape = RoundedCornerShape(8.dp)
