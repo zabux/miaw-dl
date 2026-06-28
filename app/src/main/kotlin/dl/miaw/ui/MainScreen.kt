@@ -1032,21 +1032,21 @@ fun MainScreen() {
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("How to Use", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            Text("Cara Menggunakan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(6.dp))
                             listOf(
-                                "1. Open TikTok / Instagram / YouTube or any supported app",
-                                "2. Copy the video link you want to download",
-                                "3. Select the platform from the dropdown",
-                                "4. Paste the link & tap Download",
-                                "5. Tap Download on each media item that appears",
-                                "Files will be saved to your Downloads folder"
+                                "1. Buka TikTok / Instagram / YouTube atau aplikasi lainnya",
+                                "2. Salin tautan (link) video yang ingin Anda unduh",
+                                "3. Pilih platform yang sesuai dari menu pilihan",
+                                "4. Tempel tautan & ketuk tombol Unduh",
+                                "5. Ketuk Unduh pada setiap media yang muncul",
+                                "File akan otomatis tersimpan di folder Unduhan (Downloads) Anda"
                             ).forEach {
                                 Text("\u2022 $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 1.dp))
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "Platform: TikTok, Instagram, Twitter/X, YouTube, Facebook, CapCut, Google Drive, Pinterest, Xiaohongshu, Douyin, SnackVideo, Cocofun, Spotify, SoundCloud, Threads, Kuaishou, MediaFire",
+                                "Platform yang didukung: TikTok, Instagram, Twitter/X, YouTube, Facebook, CapCut, Google Drive, Pinterest, Xiaohongshu, Douyin, SnackVideo, Cocofun, Spotify, SoundCloud, Threads, Kuaishou, MediaFire",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, lineHeight = 18.sp
                             )
                         }
