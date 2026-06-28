@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.btch.dls"
+    namespace = "dl.miaw"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.btch.dls"
+        applicationId = "dl.miaw"
         minSdk = 26
         targetSdk = 36
         versionCode = 4

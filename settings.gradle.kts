@@ -19,7 +19,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "btch-downloader-ktor"
+rootProject.name = "miaw-dl"
 
 include(":lib")
 include(":app")

@@ -1,9 +1,9 @@
-package com.btch.dls
+package dl.miaw
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.btch.dls.ui.MainScreen
+import dl.miaw.ui.MainScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

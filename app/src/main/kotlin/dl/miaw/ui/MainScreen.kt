@@ -1,4 +1,4 @@
-package com.btch.dls.ui
+package dl.miaw.ui
 
 import android.app.DownloadManager
 import android.content.Context
@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import com.btch.dls.R
+import dl.miaw.R
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -757,7 +757,7 @@ fun MainScreen() {
                             colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                         )
                         Text(
-                            "Media Downloader",
+                            "miaw-dl",
                             style = MaterialTheme.typography.titleLarge.copy(brush = gradientBrush, fontWeight = FontWeight.Bold)
                         )
                     },

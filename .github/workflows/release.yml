@@ -7,22 +7,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Dibutuhkan untuk membuat Release dan mengunggah aset
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Penting: Dibutuhkan agar bisa membaca history commit untuk Changelog
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+          cache: 'gradle' # Menambahkan cache agar build lebih cepat
 
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Build APK
         run: ./gradlew :app:assembleRelease
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk btch-dl.apk
+        run: cp app/build/outputs/apk/release/app-release.apk miaw-dl.apk
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: btch-dl.apk
+          files: miaw-dl.apk
           generate_release_notes: true
