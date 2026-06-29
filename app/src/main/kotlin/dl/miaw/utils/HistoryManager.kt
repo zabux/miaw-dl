@@ -13,7 +13,9 @@ data class HistoryItem(
     val caption: String,
     val sourceUrl: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val platform: String
+    val platform: String,
+    val mediaUrl: String = "",
+    val mediaType: String = "video"
 )
 
 object HistoryManager {
@@ -34,19 +36,20 @@ object HistoryManager {
         }
     }
 
-    fun addToHistory(context: Context, caption: String, sourceUrl: String, platform: String) {
+    fun addToHistory(context: Context, caption: String, sourceUrl: String, platform: String, mediaUrl: String, mediaType: String) {
         val currentHistory = getHistory(context).toMutableList()
-        // Avoid adding duplicates (same sourceUrl and caption)
-        if (currentHistory.any { it.sourceUrl == sourceUrl && it.caption == caption }) {
+        // Avoid duplicates
+        if (currentHistory.any { it.sourceUrl == sourceUrl && it.mediaUrl == mediaUrl }) {
             return
         }
         val newItem = HistoryItem(
             caption = caption.trim(),
             sourceUrl = sourceUrl.trim(),
-            platform = platform
+            platform = platform,
+            mediaUrl = mediaUrl,
+            mediaType = mediaType
         )
         currentHistory.add(0, newItem) // add to top
-        // Limit history to e.g. 50 items
         if (currentHistory.size > 50) {
             currentHistory.removeLast()
         }
