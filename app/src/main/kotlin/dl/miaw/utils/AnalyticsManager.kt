@@ -9,7 +9,7 @@ object AnalyticsManager {
 
     fun init(context: Context, token: String) {
         try {
-            mixpanel = MixpanelAPI.getInstance(context, token, true)
+            mixpanel = MixpanelAPI.getInstance(context, token, false)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -22,6 +22,7 @@ object AnalyticsManager {
                 jsonProps.put(key, value)
             }
             mixpanel?.track(eventName, jsonProps)
+            mixpanel?.flush() // Flush immediately for real-time dashboard
         } catch (e: Exception) {
             e.printStackTrace()
         }
