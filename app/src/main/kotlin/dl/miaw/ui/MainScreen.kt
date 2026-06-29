@@ -958,46 +958,46 @@ fun MainScreen() {
                             }
                         }
                     }
+                }
 
-                    // Riwayat Unduhan Section
-                    if (historyList.isNotEmpty()) {
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            "Riwayat Unduhan",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        TextButton(onClick = {
-                                            HistoryManager.clearHistory(context)
-                                            historyList = emptyList()
-                                        }) {
-                                            Text("Hapus Semua", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
-                                        }
+                // Riwayat Unduhan Section
+                if (historyList.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "Riwayat Unduhan",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    TextButton(onClick = {
+                                        HistoryManager.clearHistory(context)
+                                        historyList = emptyList()
+                                    }) {
+                                        Text("Hapus Semua", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                                     }
-                                    Spacer(Modifier.height(8.dp))
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        historyList.take(5).forEach { item ->
-                                            HistoryItemRow(item, context, onItemClick = { selectedUrl ->
-                                                url = selectedUrl
-                                                autoDetectPlatform(selectedUrl)?.let { detected -> selectedPlatform = detected }
-                                                result = null
-                                                error = null
-                                            }) { removedItem ->
-                                                HistoryManager.removeFromHistory(context, removedItem.id)
-                                                historyList = HistoryManager.getHistory(context)
-                                            }
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    historyList.take(5).forEach { item ->
+                                        HistoryItemRow(item, context, onItemClick = { selectedUrl ->
+                                            url = selectedUrl
+                                            autoDetectPlatform(selectedUrl)?.let { detected -> selectedPlatform = detected }
+                                            result = null
+                                            error = null
+                                        }) { removedItem ->
+                                            HistoryManager.removeFromHistory(context, removedItem.id)
+                                            historyList = HistoryManager.getHistory(context)
                                         }
                                     }
                                 }
