@@ -64,6 +64,11 @@ import compose.icons.fontawesomeicons.brands.Whatsapp
 import dl.miaw.utils.UpdateManager
 import dl.miaw.utils.UpdateInfo
 import dl.miaw.utils.AnalyticsManager
+import dl.miaw.utils.HistoryManager
+import dl.miaw.utils.HistoryItem
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import android.widget.Toast
 
 private val platforms = listOf(
     "ttdl"              to "TikTok",
@@ -253,7 +258,7 @@ private suspend fun saveFile(context: Context, url: String, suggestedName: Strin
         .setTitle(sanitizedName)
         .setDescription("Downloading...")
         .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, sanitizedName)
+        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "miaw-dl/$sanitizedName")
         .setAllowedOverMetered(true)
         .setAllowedOverRoaming(true)
     
@@ -270,7 +275,12 @@ private suspend fun saveFile(context: Context, url: String, suggestedName: Strin
 
 
 @Composable
-private fun MediaDownloadRow(label: String, url: String, onDownload: suspend () -> Long) {
+private fun MediaDownloadRow(
+    label: String,
+    url: String,
+    onDownload: suspend () -> Long,
+    onSuccess: () -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var downloadId by remember { mutableStateOf<Long?>(null) }
@@ -353,7 +363,10 @@ private fun MediaDownloadRow(label: String, url: String, onDownload: suspend () 
                                 isPreparing = true
                                 val id = onDownload()
                                 isPreparing = false
-                                if (id != -1L) downloadId = id
+                                if (id != -1L) {
+                                    downloadId = id
+                                    onSuccess()
+                                }
                             } 
                         },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -377,7 +390,13 @@ private fun MediaDownloadRow(label: String, url: String, onDownload: suspend () 
 }
 
 @Composable
-private fun ContentField(key: String, value: JsonElement, context: Context, suggestedNamePrefix: String? = null) {
+private fun ContentField(
+    key: String,
+    value: JsonElement,
+    context: Context,
+    suggestedNamePrefix: String? = null,
+    onSuccessDownload: (String) -> Unit
+) {
     if (key in metaKeys) return
     when (value) {
         is JsonPrimitive -> when {
@@ -385,7 +404,12 @@ private fun ContentField(key: String, value: JsonElement, context: Context, sugg
                 val s = value.asString()
                 if (s != null && isUrl(s)) {
                     val suggestedName = if (!suggestedNamePrefix.isNullOrBlank()) "${suggestedNamePrefix}_$key" else null
-                    MediaDownloadRow(label = key, url = s, onDownload = { saveFile(context, s, suggestedName) })
+                    MediaDownloadRow(
+                        label = key,
+                        url = s,
+                        onDownload = { saveFile(context, s, suggestedName) },
+                        onSuccess = { onSuccessDownload(suggestedNamePrefix ?: key) }
+                    )
                 }
                 else if (s != null) LabeledTextRow(key = key, value = s)
             }
@@ -401,7 +425,12 @@ private fun ContentField(key: String, value: JsonElement, context: Context, sugg
                     if (u != null && isUrl(u)) {
                         val label = if (value.size > 1) "$key ${i + 1}" else key
                         val suggestedName = if (!suggestedNamePrefix.isNullOrBlank()) "${suggestedNamePrefix}_$label" else null
-                        MediaDownloadRow(label = label, url = u, onDownload = { saveFile(context, u, suggestedName) })
+                        MediaDownloadRow(
+                            label = label,
+                            url = u,
+                            onDownload = { saveFile(context, u, suggestedName) },
+                            onSuccess = { onSuccessDownload(suggestedNamePrefix ?: label) }
+                        )
                     }
                 }
             }
@@ -448,7 +477,13 @@ private fun ThumbnailCard(url: String?) {
 }
 
 @Composable
-private fun PlatformSpecificContent(platform: String, element: JsonObject, context: Context, onYtDownload: (String) -> Unit = {}) {
+private fun PlatformSpecificContent(
+    platform: String,
+    element: JsonObject,
+    context: Context,
+    onSuccessDownload: (String) -> Unit,
+    onYtDownload: (String) -> Unit = {}
+) {
     val payload = element["result"]?.asObject() ?: element["data"]?.asObject() ?: element["res_data"]?.asObject() ?: element
 
     val title = payload["title"]?.asString()
@@ -462,7 +497,7 @@ private fun PlatformSpecificContent(platform: String, element: JsonObject, conte
     fun RenderRow(label: String, url: String?) {
         if (url != null && isUrl(url)) {
             val suggestedName = if (!title.isNullOrBlank()) "${title}_$label" else null
-            MediaDownloadRow(label, url, { saveFile(context, url, suggestedName) })
+            MediaDownloadRow(label, url, { saveFile(context, url, suggestedName) }, onSuccess = { onSuccessDownload(title ?: label) })
         }
     }
 
@@ -755,6 +790,16 @@ fun MainScreen() {
 
     var selectedPlatform by remember { mutableStateOf(platforms.first().first) }
     var url by remember { mutableStateOf("") }
+    var historyList by remember { mutableStateOf(emptyList<HistoryItem>()) }
+    
+    LaunchedEffect(Unit) {
+        historyList = HistoryManager.getHistory(context)
+    }
+
+    val onSuccessDownload = { caption: String ->
+        HistoryManager.addToHistory(context, caption, url, selectedPlatform)
+        historyList = HistoryManager.getHistory(context)
+    }
     var result by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -913,6 +958,52 @@ fun MainScreen() {
                             }
                         }
                     }
+
+                    // Riwayat Unduhan Section
+                    if (historyList.isNotEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "Riwayat Unduhan",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        TextButton(onClick = {
+                                            HistoryManager.clearHistory(context)
+                                            historyList = emptyList()
+                                        }) {
+                                            Text("Hapus Semua", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        historyList.take(5).forEach { item ->
+                                            HistoryItemRow(item, context, onItemClick = { selectedUrl ->
+                                                url = selectedUrl
+                                                autoDetectPlatform(selectedUrl)?.let { detected -> selectedPlatform = detected }
+                                                result = null
+                                                error = null
+                                            }) { removedItem ->
+                                                HistoryManager.removeFromHistory(context, removedItem.id)
+                                                historyList = HistoryManager.getHistory(context)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if (loading) {
@@ -968,7 +1059,7 @@ fun MainScreen() {
                                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        PlatformSpecificContent(selectedPlatform, element, context) { ytUrl ->
+                                        PlatformSpecificContent(selectedPlatform, element, context, onSuccessDownload) { ytUrl ->
                                             url = ytUrl
                                             selectedPlatform = "youtube"
                                             result = null
@@ -1006,17 +1097,17 @@ fun MainScreen() {
                                                 if (url != null && isUrl(url)) {
                                                     Spacer(Modifier.height(8.dp))
                                                     val suggestedName = if (!title.isNullOrBlank()) "${title}_Media_${idx + 1}" else null
-                                                    MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url, suggestedName) })
+                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url, suggestedName) }, onSuccess = { onSuccessDownload(title ?: "Media ${idx + 1}") })
                                                 }
                                                 val entries = obj.entries.filter { (k, _) -> k !in metaKeys && k != "url" }
                                                 if (entries.isNotEmpty()) {
                                                     Spacer(Modifier.height(8.dp))
-                                                    entries.forEach { (k, v) -> ContentField(k, v, context, title) }
+                                                     entries.forEach { (k, v) -> ContentField(k, v, context, title, onSuccessDownload) }
                                                 }
                                             } else {
                                                 val url = el.asString()
                                                 if (url != null && isUrl(url)) {
-                                                    MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url) })
+                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url) }, onSuccess = { onSuccessDownload("Media ${idx + 1}") })
                                                 }
                                             }
                                         }
@@ -1141,4 +1232,88 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
             }
         }
     )
+}
+
+@Composable
+private fun HistoryItemRow(
+    item: HistoryItem,
+    context: Context,
+    onItemClick: (String) -> Unit,
+    onDelete: (HistoryItem) -> Unit
+) {
+    val clipboardManager = LocalClipboardManager.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onItemClick(item.sourceUrl) },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = getPlatformColor(item.platform, MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = item.platform.take(2).uppercase(),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.caption,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = item.sourceUrl,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable {
+                        clipboardManager.setText(AnnotatedString(item.sourceUrl))
+                        Toast.makeText(context, "Link disalin ke clipboard", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { onDelete(item) }, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Hapus Riwayat",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun getPlatformColor(platform: String, defaultColor: Color): Color {
+    return when (platform.lowercase()) {
+        "tiktok", "ttdl" -> Color(0xFF000000)
+        "instagram", "igdl" -> Color(0xFFE1306C)
+        "youtube", "yts" -> Color(0xFFFF0000)
+        "facebook", "fbdown" -> Color(0xFF1877F2)
+        "twitter", "x" -> Color(0xFF1DA1F2)
+        "threads" -> Color(0xFF000000)
+        "spotify" -> Color(0xFF1DB954)
+        "soundcloud" -> Color(0xFFFF5500)
+        else -> defaultColor
+    }
 }

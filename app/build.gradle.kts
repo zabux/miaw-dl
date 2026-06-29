@@ -14,8 +14,8 @@ android {
         applicationId = "dl.miaw"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "1.5.2"
+        versionCode = 19
+        versionName = "1.6.0"
     }
     buildFeatures {
         compose = true
