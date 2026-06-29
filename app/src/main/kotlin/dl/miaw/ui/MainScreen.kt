@@ -764,6 +764,7 @@ fun MainScreen() {
     MaterialTheme(colorScheme = scheme) {
         Scaffold(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            bottomBar = { AdBanner() },
             topBar = {
                 TopAppBar(
                     title = {

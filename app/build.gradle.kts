@@ -13,8 +13,8 @@ android {
         applicationId = "dl.miaw"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "1.3.2"
+        versionCode = 15
+        versionName = "1.4.0"
     }
     buildFeatures {
         compose = true
@@ -51,6 +51,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.serialization.json)
     
+    // AdMob
+    implementation("com.google.android.gms:play-services-ads:23.1.0")
+
     // Mixpanel Analytics
     implementation("com.mixpanel.android:mixpanel-android:7.5.4")
 
