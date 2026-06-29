@@ -59,6 +59,8 @@ import compose.icons.fontawesomeicons.solid.Times
 import compose.icons.fontawesomeicons.solid.Adjust
 import compose.icons.fontawesomeicons.solid.Download
 import compose.icons.fontawesomeicons.solid.Search
+import compose.icons.fontawesomeicons.Brands
+import compose.icons.fontawesomeicons.brands.Whatsapp
 import dl.miaw.utils.UpdateManager
 import dl.miaw.utils.UpdateInfo
 import dl.miaw.utils.AnalyticsManager
@@ -777,6 +779,17 @@ fun MainScreen() {
                         )
                     },
                     actions = {
+                        val uriHandler = LocalUriHandler.current
+                        IconButton(onClick = {
+                            uriHandler.openUri("https://wa.me/6285182813774?text=Halo%20Admin%2C%20saya%20menemukan%20bug%2Ferror%20di%20Miaw-dl...")
+                        }) {
+                            Icon(
+                                imageVector = FontAwesomeIcons.Brands.Whatsapp,
+                                contentDescription = "Laporkan bug ke Admin",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
                         val rotation by animateFloatAsState(targetValue = if (isDarkMode) 180f else 0f, label = "dark_mode_rotation", animationSpec = tween(500))
                         IconButton(onClick = {
                             isDarkMode = !isDarkMode
