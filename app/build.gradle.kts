@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -13,8 +14,8 @@ android {
         applicationId = "dl.miaw"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.4.0"
+        versionCode = 16
+        versionName = "1.5.0"
     }
     buildFeatures {
         compose = true
@@ -54,8 +55,9 @@ dependencies {
     // AdMob
     implementation("com.google.android.gms:play-services-ads:23.1.0")
 
-    // Mixpanel Analytics
-    implementation("com.mixpanel.android:mixpanel-android:7.5.4")
+    // Firebase Analytics
+    implementation(platform("com.google.firebase:firebase-bom:33.1.1"))
+    implementation("com.google.firebase:firebase-analytics")
 
     // Compose
     implementation(platform(libs.compose.bom))

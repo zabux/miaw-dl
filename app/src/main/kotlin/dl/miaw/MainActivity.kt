@@ -14,8 +14,8 @@ class MainActivity : ComponentActivity() {
         // Init Mobile Ads
         MobileAds.initialize(this) {}
         
-        // Init Mixpanel Analytics
-        AnalyticsManager.init(this, "3c21db73c2b1e4722241404604e60b54")
+        // Init Firebase Analytics
+        AnalyticsManager.init(this)
         AnalyticsManager.trackEvent("App_Opened")
 
         setContent {

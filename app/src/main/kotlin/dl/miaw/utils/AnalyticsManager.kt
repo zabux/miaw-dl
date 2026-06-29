@@ -1,15 +1,15 @@
 package dl.miaw.utils
 
 import android.content.Context
-import com.mixpanel.android.mpmetrics.MixpanelAPI
-import org.json.JSONObject
+import android.os.Bundle
+import com.google.firebase.analytics.FirebaseAnalytics
 
 object AnalyticsManager {
-    private var mixpanel: MixpanelAPI? = null
+    private var firebaseAnalytics: FirebaseAnalytics? = null
 
-    fun init(context: Context, token: String) {
+    fun init(context: Context, token: String? = null) {
         try {
-            mixpanel = MixpanelAPI.getInstance(context, token, false)
+            firebaseAnalytics = FirebaseAnalytics.getInstance(context)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -17,12 +17,19 @@ object AnalyticsManager {
 
     fun trackEvent(eventName: String, properties: Map<String, Any>? = null) {
         try {
-            val jsonProps = JSONObject()
+            val bundle = Bundle()
             properties?.forEach { (key, value) ->
-                jsonProps.put(key, value)
+                when (value) {
+                    is String -> bundle.putString(key, value)
+                    is Int -> bundle.putInt(key, value)
+                    is Long -> bundle.putLong(key, value)
+                    is Float -> bundle.putFloat(key, value)
+                    is Double -> bundle.putDouble(key, value)
+                    is Boolean -> bundle.putBoolean(key, value)
+                    else -> bundle.putString(key, value.toString())
+                }
             }
-            mixpanel?.track(eventName, jsonProps)
-            mixpanel?.flush() // Flush immediately for real-time dashboard
+            firebaseAnalytics?.logEvent(eventName, bundle)
         } catch (e: Exception) {
             e.printStackTrace()
         }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "282646972351",
+    "project_id": "miaw-dl",
+    "storage_bucket": "miaw-dl.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282646972351:android:6c32375cbab3a7c4c9430a",
+        "android_client_info": {
+          "package_name": "dl.miaw"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOuDewTg-jS6NmsE-LgGlxIeReFpTd7ac"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
