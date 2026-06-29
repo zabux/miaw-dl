@@ -77,7 +77,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import android.widget.VideoView
 import android.widget.MediaController
 import android.media.MediaPlayer
-import android.net.Uri
 import compose.icons.fontawesomeicons.solid.Play
 import compose.icons.fontawesomeicons.solid.Pause
 import compose.icons.fontawesomeicons.solid.Music
@@ -1114,7 +1113,7 @@ fun MainScreen() {
                                                 if (url != null && isUrl(url)) {
                                                     Spacer(Modifier.height(8.dp))
                                                     val suggestedName = if (!title.isNullOrBlank()) "${title}_Media_${idx + 1}" else null
-                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url, suggestedName) }, onSuccess = { onSuccessDownload(title ?: "Media ${idx + 1}") })
+                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url, suggestedName) }, onSuccess = { mediaUrl, mediaType -> onSuccessDownload(title ?: "Media ${idx + 1}", mediaUrl, mediaType) })
                                                 }
                                                 val entries = obj.entries.filter { (k, _) -> k !in metaKeys && k != "url" }
                                                 if (entries.isNotEmpty()) {
@@ -1124,7 +1123,7 @@ fun MainScreen() {
                                             } else {
                                                 val url = el.asString()
                                                 if (url != null && isUrl(url)) {
-                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url) }, onSuccess = { onSuccessDownload("Media ${idx + 1}") })
+                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url) }, onSuccess = { mediaUrl, mediaType -> onSuccessDownload("Media ${idx + 1}", mediaUrl, mediaType) })
                                                 }
                                             }
                                         }
