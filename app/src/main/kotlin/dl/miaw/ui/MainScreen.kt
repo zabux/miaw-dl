@@ -299,6 +299,8 @@ private fun MediaDownloadRow(
     var isDownloading by remember { mutableStateOf(false) }
     var isCompleted by remember { mutableStateOf(false) }
     var isPreparing by remember { mutableStateOf(false) }
+    var downloadedFileUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var downloadedMimeType by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(downloadId) {
         val id = downloadId ?: return@LaunchedEffect
@@ -327,6 +329,16 @@ private fun MediaDownloadRow(
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
                         progress = 1f
                         isCompleted = true
+                        // Get the URI and MIME type from DownloadManager
+                        val localUriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
+                        val mimeIndex = cursor.getColumnIndex(DownloadManager.COLUMN_MEDIA_TYPE)
+                        val localUri = if (localUriIndex != -1) cursor.getString(localUriIndex) else null
+                        val mime = if (mimeIndex != -1) cursor.getString(mimeIndex) else null
+                        if (localUri != null) {
+                            downloadedFileUri = android.net.Uri.parse(localUri)
+                        }
+                        downloadedMimeType = mime?.takeIf { it.isNotBlank() }
+                            ?: guessMimeFromUrl(url, label)
                     }
                 }
             } else {
@@ -366,6 +378,32 @@ private fun MediaDownloadRow(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
+                } else if (isCompleted && downloadedFileUri != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // "Buka" button — opens in system gallery/player
+                        Button(
+                            onClick = {
+                                val mime = downloadedMimeType ?: "video/*"
+                                val fileUri = downloadedFileUri!!
+                                // Use FileProvider content URI for Android 7+
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                    setDataAndType(fileUri, mime)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Tidak ada aplikasi untuk membuka file ini", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Buka", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 } else {
                     Button(
                         onClick = { 
@@ -384,11 +422,11 @@ private fun MediaDownloadRow(
                         modifier = Modifier.height(34.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) { 
-                        Text(if (isCompleted) "Done" else "Download", style = MaterialTheme.typography.labelMedium) 
+                        Text("Download", style = MaterialTheme.typography.labelMedium) 
                     }
                 }
             }
-            if (isDownloading || isCompleted) {
+            if (isDownloading || (isCompleted && progress > 0f)) {
                 androidx.compose.material3.LinearProgressIndicator(
                     progress = progress,
                     modifier = Modifier.fillMaxWidth().height(4.dp),
@@ -398,6 +436,7 @@ private fun MediaDownloadRow(
             }
         }
     }
+
 }
 
 @Composable
@@ -1532,3 +1571,27 @@ private fun detectMediaType(url: String, label: String): String {
         else -> "video"
     }
 }
+
+private fun guessMimeFromUrl(url: String, label: String): String {
+    val cleanUrl = url.lowercase()
+    val cleanLabel = label.lowercase()
+    return when {
+        cleanUrl.endsWith(".mp3") -> "audio/mpeg"
+        cleanUrl.endsWith(".m4a") -> "audio/mp4"
+        cleanUrl.endsWith(".wav") -> "audio/wav"
+        cleanUrl.endsWith(".ogg") -> "audio/ogg"
+        cleanLabel.contains("audio") || cleanLabel.contains("music") || cleanLabel.contains("mp3") -> "audio/*"
+        
+        cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg") -> "image/jpeg"
+        cleanUrl.endsWith(".png") -> "image/png"
+        cleanUrl.endsWith(".webp") -> "image/webp"
+        cleanUrl.endsWith(".gif") -> "image/gif"
+        cleanLabel.contains("image") || cleanLabel.contains("photo") || cleanLabel.contains("thumbnail") || cleanLabel.contains("thumb") -> "image/*"
+        
+        cleanUrl.endsWith(".mp4") -> "video/mp4"
+        cleanUrl.endsWith(".mkv") -> "video/x-matroska"
+        cleanUrl.endsWith(".webm") -> "video/webm"
+        else -> "video/*"
+    }
+}
+
