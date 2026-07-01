@@ -290,7 +290,7 @@ private fun MediaDownloadRow(
     label: String,
     url: String,
     onDownload: suspend () -> Long,
-    onSuccess: (String, String) -> Unit = { _, _ -> }
+    onSuccess: (String, String, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -337,8 +337,10 @@ private fun MediaDownloadRow(
                         if (localUri != null) {
                             downloadedFileUri = android.net.Uri.parse(localUri)
                         }
-                        downloadedMimeType = mime?.takeIf { it.isNotBlank() }
-                            ?: guessMimeFromUrl(url, label)
+                        val finalMime = mime?.takeIf { it.isNotBlank() } ?: guessMimeFromUrl(url, label)
+                        downloadedMimeType = finalMime
+                        // Trigger onSuccess only when download is completed successfully
+                        onSuccess(localUri ?: "", finalMime, url, detectMediaType(url, label))
                     }
                 }
             } else {
@@ -383,19 +385,7 @@ private fun MediaDownloadRow(
                         // "Buka" button — opens in system gallery/player
                         Button(
                             onClick = {
-                                val mime = downloadedMimeType ?: "video/*"
-                                val fileUri = downloadedFileUri!!
-                                // Use FileProvider content URI for Android 7+
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                    setDataAndType(fileUri, mime)
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Tidak ada aplikasi untuk membuka file ini", Toast.LENGTH_SHORT).show()
-                                }
+                                openFileInGallery(context, downloadedFileUri.toString(), downloadedMimeType ?: "video/*")
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier.height(34.dp),
@@ -414,7 +404,6 @@ private fun MediaDownloadRow(
                                 isPreparing = false
                                 if (id != -1L) {
                                     downloadId = id
-                                    onSuccess(url, detectMediaType(url, label))
                                 }
                             } 
                         },
@@ -445,7 +434,7 @@ private fun ContentField(
     value: JsonElement,
     context: Context,
     suggestedNamePrefix: String? = null,
-    onSuccessDownload: (String, String, String) -> Unit
+    onSuccessDownload: (String, String, String, String, String) -> Unit
 ) {
     if (key in metaKeys) return
     when (value) {
@@ -458,7 +447,9 @@ private fun ContentField(
                         label = key,
                         url = s,
                         onDownload = { saveFile(context, s, suggestedName) },
-                        onSuccess = { mediaUrl, mediaType -> onSuccessDownload(suggestedNamePrefix ?: key, mediaUrl, mediaType) }
+                        onSuccess = { localUri, mimeType, mediaUrl, mediaType ->
+                            onSuccessDownload(suggestedNamePrefix ?: key, localUri, mimeType, mediaUrl, mediaType)
+                        }
                     )
                 }
                 else if (s != null) LabeledTextRow(key = key, value = s)
@@ -479,7 +470,9 @@ private fun ContentField(
                             label = label,
                             url = u,
                             onDownload = { saveFile(context, u, suggestedName) },
-                            onSuccess = { mediaUrl, mediaType -> onSuccessDownload(suggestedNamePrefix ?: label, mediaUrl, mediaType) }
+                            onSuccess = { localUri, mimeType, mediaUrl, mediaType ->
+                                onSuccessDownload(suggestedNamePrefix ?: label, localUri, mimeType, mediaUrl, mediaType)
+                            }
                         )
                     }
                 }
@@ -531,7 +524,7 @@ private fun PlatformSpecificContent(
     platform: String,
     element: JsonObject,
     context: Context,
-    onSuccessDownload: (String, String, String) -> Unit,
+    onSuccessDownload: (String, String, String, String, String) -> Unit,
     onYtDownload: (String) -> Unit = {}
 ) {
     val payload = element["result"]?.asObject() ?: element["data"]?.asObject() ?: element["res_data"]?.asObject() ?: element
@@ -547,7 +540,14 @@ private fun PlatformSpecificContent(
     fun RenderRow(label: String, url: String?) {
         if (url != null && isUrl(url)) {
             val suggestedName = if (!title.isNullOrBlank()) "${title}_$label" else null
-            MediaDownloadRow(label, url, { saveFile(context, url, suggestedName) }, onSuccess = { mediaUrl, mediaType -> onSuccessDownload(title ?: label, mediaUrl, mediaType) })
+            MediaDownloadRow(
+                label = label,
+                url = url,
+                onDownload = { saveFile(context, url, suggestedName) },
+                onSuccess = { localUri, mimeType, mediaUrl, mediaType ->
+                    onSuccessDownload(title ?: label, localUri, mimeType, mediaUrl, mediaType)
+                }
+            )
         }
     }
 
@@ -841,14 +841,22 @@ fun MainScreen() {
     var selectedPlatform by remember { mutableStateOf(platforms.first().first) }
     var url by remember { mutableStateOf("") }
     var historyList by remember { mutableStateOf(emptyList<HistoryItem>()) }
-    var activePreviewItem by remember { mutableStateOf<HistoryItem?>(null) }
     
     LaunchedEffect(Unit) {
         historyList = HistoryManager.getHistory(context)
     }
 
-    val onSuccessDownload = { caption: String, mediaUrl: String, mediaType: String ->
-        HistoryManager.addToHistory(context, caption, url, selectedPlatform, mediaUrl, mediaType)
+    val onSuccessDownload = { caption: String, localUri: String, mimeType: String, mediaUrl: String, mediaType: String ->
+        HistoryManager.addToHistory(
+            context = context,
+            caption = caption,
+            sourceUrl = url,
+            platform = selectedPlatform,
+            localUri = localUri,
+            mimeType = mimeType,
+            mediaUrl = mediaUrl,
+            mediaType = mediaType
+        )
         historyList = HistoryManager.getHistory(context)
     }
     var result by remember { mutableStateOf<String?>(null) }
@@ -1042,15 +1050,23 @@ fun MainScreen() {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     historyList.take(5).forEach { item ->
                                         HistoryItemRow(item, context, onItemClick = { selectedItem ->
-                                            if (selectedItem.mediaUrl.isNotEmpty()) {
-                                                activePreviewItem = selectedItem
-                                            } else {
-                                                url = selectedItem.sourceUrl
-                                                autoDetectPlatform(selectedItem.sourceUrl)?.let { detected -> selectedPlatform = detected }
-                                                result = null
-                                                error = null
-                                            }
-                                        }) { removedItem ->
+                                             val targetUri = if (selectedItem.localUri.isNotEmpty()) selectedItem.localUri else selectedItem.mediaUrl
+                                             val targetMime = if (selectedItem.mimeType.isNotEmpty()) selectedItem.mimeType else {
+                                                 when (selectedItem.mediaType) {
+                                                     "audio" -> "audio/*"
+                                                     "image" -> "image/*"
+                                                     else -> "video/*"
+                                                 }
+                                             }
+                                             if (targetUri.isNotEmpty()) {
+                                                 openFileInGallery(context, targetUri, targetMime)
+                                             } else {
+                                                 url = selectedItem.sourceUrl
+                                                 autoDetectPlatform(selectedItem.sourceUrl)?.let { detected -> selectedPlatform = detected }
+                                                 result = null
+                                                 error = null
+                                             }
+                                         }) { removedItem ->
                                             HistoryManager.removeFromHistory(context, removedItem.id)
                                             historyList = HistoryManager.getHistory(context)
                                         }
@@ -1152,7 +1168,14 @@ fun MainScreen() {
                                                 if (url != null && isUrl(url)) {
                                                     Spacer(Modifier.height(8.dp))
                                                     val suggestedName = if (!title.isNullOrBlank()) "${title}_Media_${idx + 1}" else null
-                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url, suggestedName) }, onSuccess = { mediaUrl, mediaType -> onSuccessDownload(title ?: "Media ${idx + 1}", mediaUrl, mediaType) })
+                                                    MediaDownloadRow(
+                                                        label = "Media ${idx + 1}",
+                                                        url = url,
+                                                        onDownload = { saveFile(context, url, suggestedName) },
+                                                        onSuccess = { localUri, mimeType, mediaUrl, mediaType ->
+                                                            onSuccessDownload(title ?: "Media ${idx + 1}", localUri, mimeType, mediaUrl, mediaType)
+                                                        }
+                                                    )
                                                 }
                                                 val entries = obj.entries.filter { (k, _) -> k !in metaKeys && k != "url" }
                                                 if (entries.isNotEmpty()) {
@@ -1162,7 +1185,14 @@ fun MainScreen() {
                                             } else {
                                                 val url = el.asString()
                                                 if (url != null && isUrl(url)) {
-                                                     MediaDownloadRow("Media ${idx + 1}", url, { saveFile(context, url) }, onSuccess = { mediaUrl, mediaType -> onSuccessDownload("Media ${idx + 1}", mediaUrl, mediaType) })
+                                                    MediaDownloadRow(
+                                                        label = "Media ${idx + 1}",
+                                                        url = url,
+                                                        onDownload = { saveFile(context, url) },
+                                                        onSuccess = { localUri, mimeType, mediaUrl, mediaType ->
+                                                            onSuccessDownload("Media ${idx + 1}", localUri, mimeType, mediaUrl, mediaType)
+                                                        }
+                                                    )
                                                 }
                                             }
                                         }
@@ -1244,14 +1274,7 @@ fun MainScreen() {
             UpdateDialog(info = info, onDismiss = { updateInfo = null })
         }
 
-        activePreviewItem?.let { item ->
-            MediaPlayerDialog(
-                mediaUrl = item.mediaUrl,
-                mediaType = item.mediaType,
-                caption = item.caption,
-                onDismiss = { activePreviewItem = null }
-            )
-        }
+
     }
 }
 
@@ -1382,180 +1405,30 @@ private fun getPlatformColor(platform: String, defaultColor: Color): Color {
     }
 }
 
-@Composable
-fun MediaPlayerDialog(
-    mediaUrl: String,
-    mediaType: String,
-    caption: String,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = caption,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+private fun openFileInGallery(context: Context, localUriStr: String, mimeType: String) {
+    try {
+        val uri = android.net.Uri.parse(localUriStr)
+        val fileUri = if (uri.scheme == "file") {
+            val file = java.io.File(uri.path ?: "")
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
             )
-        },
-        text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .background(Color.Black, shape = RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                when (mediaType) {
-                    "image" -> {
-                        AsyncImage(
-                            model = mediaUrl,
-                            contentDescription = "Image preview",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                    "video" -> {
-                        AndroidView(
-                            factory = { ctx ->
-                                VideoView(ctx).apply {
-                                    setVideoURI(Uri.parse(mediaUrl))
-                                    val controller = MediaController(ctx)
-                                    controller.setAnchorView(this)
-                                    setMediaController(controller)
-                                    setOnPreparedListener { start() }
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    "audio" -> {
-                        AudioPlayer(mediaUrl = mediaUrl)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Tutup")
-            }
-        }
-    )
-}
-
-@Composable
-fun AudioPlayer(mediaUrl: String) {
-    var isPlaying by remember { mutableStateOf(false) }
-    var isPrepared by remember { mutableStateOf(false) }
-    var progress by remember { mutableFloatStateOf(0f) }
-    var duration by remember { mutableIntStateOf(0) }
-    var currentPosition by remember { mutableIntStateOf(0) }
-    
-    val mediaPlayer = remember { MediaPlayer() }
-    
-    LaunchedEffect(mediaUrl) {
-        try {
-            mediaPlayer.reset()
-            mediaPlayer.setDataSource(mediaUrl)
-            mediaPlayer.setOnPreparedListener { mp ->
-                isPrepared = true
-                duration = mp.duration
-            }
-            mediaPlayer.prepareAsync()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-    
-    LaunchedEffect(isPlaying) {
-        while (isPlaying && isPrepared) {
-            currentPosition = mediaPlayer.currentPosition
-            if (duration > 0) {
-                progress = currentPosition.toFloat() / duration.toFloat()
-            }
-            kotlinx.coroutines.delay(500)
-        }
-    }
-    
-    DisposableEffect(Unit) {
-        onDispose {
-            mediaPlayer.release()
-        }
-    }
-    
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        if (!isPrepared) {
-            androidx.compose.material3.CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            Text("Memuat audio...", color = Color.White, style = MaterialTheme.typography.bodySmall)
         } else {
-            Icon(
-                imageVector = FontAwesomeIcons.Solid.Music,
-                contentDescription = "Audio",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(64.dp)
-            )
-            Spacer(Modifier.height(16.dp))
-            
-            Slider(
-                value = progress,
-                onValueChange = { p ->
-                    progress = p
-                    if (duration > 0) {
-                        mediaPlayer.seekTo((p * duration).toInt())
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
-                )
-            )
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(formatTime(currentPosition), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                Text(formatTime(duration), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(Modifier.height(12.dp))
-            
-            IconButton(
-                onClick = {
-                    if (mediaPlayer.isPlaying) {
-                        mediaPlayer.pause()
-                        isPlaying = false
-                    } else {
-                        mediaPlayer.start()
-                        isPlaying = true
-                    }
-                },
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) FontAwesomeIcons.Solid.Pause else FontAwesomeIcons.Solid.Play,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            uri
         }
+        
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(fileUri, mimeType)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        Toast.makeText(context, "Tidak ada aplikasi untuk membuka file ini", Toast.LENGTH_SHORT).show()
     }
-}
-
-private fun formatTime(ms: Int): String {
-    val totalSecs = ms / 1000
-    val minutes = totalSecs / 60
-    val seconds = totalSecs % 60
-    return String.format("%02d:%02d", minutes, seconds)
 }
 
 private fun detectMediaType(url: String, label: String): String {
