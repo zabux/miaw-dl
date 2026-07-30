@@ -65,7 +65,6 @@ import compose.icons.fontawesomeicons.solid.Times
 import compose.icons.fontawesomeicons.solid.Adjust
 import compose.icons.fontawesomeicons.solid.Download
 import compose.icons.fontawesomeicons.solid.Search
-import compose.icons.fontawesomeicons.solid.AngleDown
 import compose.icons.fontawesomeicons.Brands
 import compose.icons.fontawesomeicons.brands.Whatsapp
 import dl.miaw.utils.UpdateManager
@@ -120,7 +119,6 @@ private val platformList = listOf(
 )
 
 private val platforms = platformList.map { it.key to it.name }
-
 
 private val metaKeys = setOf("status", "developer", "message", "note", "code", "creator", "success", "all", "res_data", "author")
 private val thumbnailKeys = setOf("thumbnail", "thumb", "cover", "image", "image_url", "coverUrl", "thumbnail_url")
@@ -836,6 +834,7 @@ private fun PlatformSpecificContent(
                 Spacer(Modifier.height(16.dp))
             }
         }
+    }
 }
 
 @Composable
@@ -1158,6 +1157,7 @@ fun MainScreen() {
         }
     }
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
+
     var selectedPlatform by remember { mutableStateOf(platforms.first().first) }
     var url by remember { mutableStateOf("") }
     var historyList by remember { mutableStateOf(emptyList<HistoryItem>()) }
