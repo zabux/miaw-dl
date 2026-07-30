@@ -1216,6 +1216,42 @@ fun MainScreen() {
                     },
                     actions = {
                         val uriHandler = LocalUriHandler.current
+                        
+                        // Manual Update Check Button
+                        var checkingUpdate by remember { mutableStateOf(false) }
+                        IconButton(
+                            onClick = {
+                                if (checkingUpdate) return@IconButton
+                                checkingUpdate = true
+                                Toast.makeText(context, "Mengecek pembaruan...", Toast.LENGTH_SHORT).show()
+                                scope.launch {
+                                    try {
+                                        val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+                                        val info = UpdateManager.checkForUpdate(currentVersion)
+                                        if (info != null) {
+                                            updateInfo = info
+                                        } else {
+                                            Toast.makeText(context, "Anda sudah menggunakan versi terbaru (v$currentVersion)", Toast.LENGTH_LONG).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Gagal mengecek pembaruan", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        checkingUpdate = false
+                                    }
+                                }
+                            }
+                        ) {
+                            if (checkingUpdate) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Cek Pembaruan",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
                         IconButton(onClick = {
                             uriHandler.openUri("https://wa.me/6285182813774?text=Halo%20Admin%2C%20saya%20menemukan%20bug%2Ferror%20di%20Miaw-dl...")
                         }) {

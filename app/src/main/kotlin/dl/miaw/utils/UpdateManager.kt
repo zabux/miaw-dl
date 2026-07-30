@@ -6,6 +6,7 @@ import android.os.Environment
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -18,19 +19,28 @@ object UpdateManager {
     
     suspend fun checkForUpdate(currentVersionName: String): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
-            val url = URL("https://api.github.com/repos/$REPO/releases/latest")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            val primaryUrl = "https://api.github.com/repos/$REPO/releases/latest"
+            val fallbackUrl = "https://api.github.com/repos/$REPO/releases"
             
-            if (conn.responseCode == 200) {
-                val response = conn.inputStream.bufferedReader().readText()
-                val json = JSONObject(response)
-                val tagName = json.getString("tag_name").removePrefix("v")
-                val currentVersion = currentVersionName.removePrefix("v")
+            var releaseJson: JSONObject? = fetchReleaseJson(primaryUrl)
+            if (releaseJson == null) {
+                // Try fallback to list of releases
+                val releasesArrayStr = fetchResponseText(fallbackUrl)
+                if (releasesArrayStr != null) {
+                    val array = JSONArray(releasesArrayStr)
+                    if (array.length() > 0) {
+                        releaseJson = array.getJSONObject(0)
+                    }
+                }
+            }
+
+            if (releaseJson != null) {
+                val rawTagName = releaseJson.getString("tag_name")
+                val tagName = rawTagName.removePrefix("v").trim()
+                val currentVersion = currentVersionName.removePrefix("v").trim()
                 
                 if (compareVersions(tagName, currentVersion) > 0) {
-                    val assets = json.getJSONArray("assets")
+                    val assets = releaseJson.optJSONArray("assets") ?: JSONArray()
                     var downloadUrl = ""
                     for (i in 0 until assets.length()) {
                         val asset = assets.getJSONObject(i)
@@ -40,7 +50,7 @@ object UpdateManager {
                         }
                     }
                     if (downloadUrl.isNotEmpty()) {
-                        val rawBody = json.optString("body", "Tidak ada catatan pembaruan.")
+                        val rawBody = releaseJson.optString("body", "Tidak ada catatan pembaruan.")
                         val cleanBody = rawBody.lines()
                             .filter { !it.contains("github.com", ignoreCase = true) }
                             .joinToString("\n")
@@ -62,9 +72,34 @@ object UpdateManager {
         null
     }
 
+    private fun fetchResponseText(urlString: String): String? {
+        return try {
+            val conn = URL(urlString).openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("User-Agent", "miaw-dl-android-app")
+            conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+            
+            if (conn.responseCode == 200) {
+                conn.inputStream.bufferedReader().readText()
+            } else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun fetchReleaseJson(urlString: String): JSONObject? {
+        val text = fetchResponseText(urlString) ?: return null
+        return try { JSONObject(text) } catch (e: Exception) { null }
+    }
+
     private fun compareVersions(v1: String, v2: String): Int {
-        val parts1 = v1.split(".").map { it.toIntOrNull() ?: 0 }
-        val parts2 = v2.split(".").map { it.toIntOrNull() ?: 0 }
+        val clean1 = v1.replace(Regex("[^0-9.]"), "")
+        val clean2 = v2.replace(Regex("[^0-9.]"), "")
+        val parts1 = clean1.split(".").mapNotNull { it.toIntOrNull() }
+        val parts2 = clean2.split(".").mapNotNull { it.toIntOrNull() }
         val length = maxOf(parts1.size, parts2.size)
         for (i in 0 until length) {
             val p1 = parts1.getOrElse(i) { 0 }
@@ -77,6 +112,7 @@ object UpdateManager {
     suspend fun downloadAndInstall(context: Context, url: String, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
         try {
             val connection = URL(url).openConnection() as HttpURLConnection
+            connection.setRequestProperty("User-Agent", "miaw-dl-android-app")
             connection.connect()
             val fileLength = connection.contentLength
             val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
