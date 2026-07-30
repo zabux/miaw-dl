@@ -47,9 +47,15 @@ import io.btch.downloader.BtchDownloader
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import android.content.ClipboardManager
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ArrowDropDown
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.solid.Clipboard
@@ -59,6 +65,7 @@ import compose.icons.fontawesomeicons.solid.Times
 import compose.icons.fontawesomeicons.solid.Adjust
 import compose.icons.fontawesomeicons.solid.Download
 import compose.icons.fontawesomeicons.solid.Search
+import compose.icons.fontawesomeicons.solid.AngleDown
 import compose.icons.fontawesomeicons.Brands
 import compose.icons.fontawesomeicons.brands.Whatsapp
 import dl.miaw.utils.UpdateManager
@@ -66,6 +73,8 @@ import dl.miaw.utils.UpdateInfo
 import dl.miaw.utils.AnalyticsManager
 import dl.miaw.utils.HistoryManager
 import dl.miaw.utils.HistoryItem
+import dl.miaw.utils.PlatformHealthManager
+import dl.miaw.utils.HealthStatus
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import android.widget.Toast
@@ -81,27 +90,37 @@ import compose.icons.fontawesomeicons.solid.Play
 import compose.icons.fontawesomeicons.solid.Pause
 import compose.icons.fontawesomeicons.solid.Music
 
-private val platforms = listOf(
-    "ttdl"              to "TikTok",
-    "igdl"              to "Instagram",
-    "twitter"           to "Twitter / X",
-    "youtube"           to "YouTube",
-    "fbdown"            to "Facebook",
-    "capcut"            to "CapCut",
-    "gdrive"            to "Google Drive",
-    "pinterest"         to "Pinterest",
-    "rednote"            to "Xiaohongshu",
-    "rednote-profile"    to "Xiaohongshu Profile",
-    "douyin"            to "Douyin",
-    "snackvideo"        to "SnackVideo",
-    "cocofun"           to "Cocofun",
-    "spotify"           to "Spotify",
-    "yts"               to "YouTube Search",
-    "soundcloud"        to "SoundCloud",
-    "threads"           to "Threads",
-    "kuaishou"          to "Kuaishou",
-    "mediafire"         to "MediaFire",
+data class PlatformInfo(
+    val key: String,
+    val name: String,
+    val category: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector
 )
+
+private val platformList = listOf(
+    PlatformInfo("ttdl", "TikTok", "Short Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("igdl", "Instagram", "Photo & Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("twitter", "Twitter / X", "Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("youtube", "YouTube", "Video & Audio", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("fbdown", "Facebook", "Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("capcut", "CapCut", "Template Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("gdrive", "Google Drive", "Cloud File", FontAwesomeIcons.Solid.Download),
+    PlatformInfo("pinterest", "Pinterest", "Photo & Video", FontAwesomeIcons.Solid.Search),
+    PlatformInfo("rednote", "Xiaohongshu", "Social Post", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("rednote-profile", "Xiaohongshu Profile", "Profile Info", FontAwesomeIcons.Solid.Search),
+    PlatformInfo("douyin", "Douyin", "Short Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("snackvideo", "SnackVideo", "Short Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("cocofun", "Cocofun", "Short Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("spotify", "Spotify", "Music & Audio", FontAwesomeIcons.Solid.Music),
+    PlatformInfo("yts", "YouTube Search", "Search Engine", FontAwesomeIcons.Solid.Search),
+    PlatformInfo("soundcloud", "SoundCloud", "Music & Audio", FontAwesomeIcons.Solid.Music),
+    PlatformInfo("threads", "Threads", "Social Post", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("kuaishou", "Kuaishou", "Short Video", FontAwesomeIcons.Solid.Play),
+    PlatformInfo("mediafire", "MediaFire", "Cloud File", FontAwesomeIcons.Solid.Download),
+)
+
+private val platforms = platformList.map { it.key to it.name }
+
 
 private val metaKeys = setOf("status", "developer", "message", "note", "code", "creator", "success", "all", "res_data", "author")
 private val thumbnailKeys = setOf("thumbnail", "thumb", "cover", "image", "image_url", "coverUrl", "thumbnail_url")
@@ -820,6 +839,311 @@ private fun PlatformSpecificContent(
     }
 }
 
+}
+
+@Composable
+private fun StatusBadge(status: HealthStatus, modifier: Modifier = Modifier) {
+    val (color, text) = when (status) {
+        HealthStatus.ONLINE -> Color(0xFF4CAF50) to "Aktif"
+        HealthStatus.DEGRADED -> Color(0xFFFFB300) to "Terbatas"
+        HealthStatus.OFFLINE -> Color(0xFFF44336) to "Error"
+        HealthStatus.CHECKING -> Color(0xFF9E9E9E) to "Mengecek"
+    }
+
+    Surface(
+        color = color.copy(alpha = 0.15f),
+        shape = CircleShape,
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .background(color, CircleShape)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = color
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModernPlatformSelector(
+    selectedKey: String,
+    healthMap: Map<String, HealthStatus>,
+    onClick: () -> Unit
+) {
+    val currentPlatform = platformList.find { it.key == selectedKey } ?: platformList.first()
+    val status = healthMap[selectedKey] ?: HealthStatus.CHECKING
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = currentPlatform.icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Column {
+                    Text(
+                        text = currentPlatform.name,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = currentPlatform.category,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatusBadge(status = status)
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Pilih Platform",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlatformSelectionModal(
+    selectedKey: String,
+    healthMap: Map<String, HealthStatus>,
+    isRefreshing: Boolean,
+    onSelect: (String) -> Unit,
+    onRefreshStatus: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("Semua") }
+
+    val categories = remember {
+        listOf("Semua", "Short Video", "Video & Audio", "Music & Audio", "Photo & Video", "Cloud File")
+    }
+
+    val filteredPlatforms = remember(searchQuery, selectedCategory) {
+        platformList.filter { platform ->
+            val matchesQuery = platform.name.contains(searchQuery, ignoreCase = true) ||
+                    platform.key.contains(searchQuery, ignoreCase = true) ||
+                    platform.category.contains(searchQuery, ignoreCase = true)
+            val matchesCategory = selectedCategory == "Semua" || platform.category.contains(selectedCategory, ignoreCase = true)
+            matchesQuery && matchesCategory
+        }
+    }
+
+    val onlineCount = healthMap.values.count { it == HealthStatus.ONLINE }
+    val errorCount = healthMap.values.count { it == HealthStatus.OFFLINE || it == HealthStatus.DEGRADED }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Tutup")
+            }
+        },
+        title = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Pilih Downloader",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                    IconButton(onClick = onRefreshStatus, enabled = !isRefreshing) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh Status",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        color = Color(0xFF4CAF50).copy(alpha = 0.15f),
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            text = "🟢 $onlineCount Aktif",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF2E7D32),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                    if (errorCount > 0) {
+                        Surface(
+                            color = Color(0xFFF44336).copy(alpha = 0.15f),
+                            shape = CircleShape
+                        ) {
+                            Text(
+                                text = "🔴 $errorCount Error/Terbatas",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFC62828),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Cari platform...", style = MaterialTheme.typography.bodyMedium) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    trailingIcon = if (searchQuery.isNotEmpty()) {
+                        { IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp)) } }
+                    } else null,
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(categories) { cat ->
+                        val isSelected = cat == selectedCategory
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedCategory = cat },
+                            label = { Text(cat, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 340.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(filteredPlatforms.size) { index ->
+                        val platform = filteredPlatforms[index]
+                        val isCurrent = platform.key == selectedKey
+                        val status = healthMap[platform.key] ?: HealthStatus.CHECKING
+
+                        Surface(
+                            onClick = { onSelect(platform.key) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            border = if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = platform.icon,
+                                                contentDescription = null,
+                                                tint = if (isCurrent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Column {
+                                        Text(
+                                            text = platform.name,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = platform.category,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                StatusBadge(status = status)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
@@ -837,10 +1161,21 @@ fun MainScreen() {
         }
     }
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
-
     var selectedPlatform by remember { mutableStateOf(platforms.first().first) }
     var url by remember { mutableStateOf("") }
     var historyList by remember { mutableStateOf(emptyList<HistoryItem>()) }
+    
+    var healthMap by remember { mutableStateOf<Map<String, HealthStatus>>(emptyMap()) }
+    var isRefreshingHealth by remember { mutableStateOf(false) }
+    var showPlatformModal by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        isRefreshingHealth = true
+        PlatformHealthManager.checkAllPlatforms(api, platformList.map { it.key }) { updatedMap ->
+            healthMap = updatedMap
+        }
+        isRefreshingHealth = false
+    }
     
     LaunchedEffect(Unit) {
         historyList = HistoryManager.getHistory(context)
@@ -921,38 +1256,37 @@ fun MainScreen() {
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Platform", style = MaterialTheme.typography.labelMedium)
-                            Spacer(Modifier.height(4.dp))
-                            var expanded by remember { mutableStateOf(false) }
-                            ExposedDropdownMenuBox(
-                                expanded = expanded,
-                                onExpandedChange = { expanded = it }
-                            ) {
-                                OutlinedTextField(
-                                    value = platforms.find { it.first == selectedPlatform }?.second ?: "",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
-                                    singleLine = true,
-                                    textStyle = MaterialTheme.typography.labelSmall,
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = expanded,
-                                    onDismissRequest = { expanded = false }
-                                ) {
-                                    platforms.forEach { (key, name) ->
-                                        DropdownMenuItem(
-                                            text = { Text(name) },
-                                            onClick = {
-                                                selectedPlatform = key
-                                                result = null
-                                                error = null
-                                                expanded = false
+                            Text("Platform Downloader", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(6.dp))
+                            
+                            ModernPlatformSelector(
+                                selectedKey = selectedPlatform,
+                                healthMap = healthMap,
+                                onClick = { showPlatformModal = true }
+                            )
+
+                            if (showPlatformModal) {
+                                PlatformSelectionModal(
+                                    selectedKey = selectedPlatform,
+                                    healthMap = healthMap,
+                                    isRefreshing = isRefreshingHealth,
+                                    onSelect = { key ->
+                                        selectedPlatform = key
+                                        result = null
+                                        error = null
+                                        showPlatformModal = false
+                                    },
+                                    onRefreshStatus = {
+                                        scope.launch {
+                                            isRefreshingHealth = true
+                                            PlatformHealthManager.checkAllPlatforms(api, platformList.map { it.key }) { updatedMap ->
+                                                healthMap = updatedMap
                                             }
-                                        )
-                                    }
-                                }
+                                            isRefreshingHealth = false
+                                        }
+                                    },
+                                    onDismiss = { showPlatformModal = false }
+                                )
                             }
                             Spacer(Modifier.height(12.dp))
                             OutlinedTextField(
