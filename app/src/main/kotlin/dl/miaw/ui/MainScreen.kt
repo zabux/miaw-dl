@@ -836,9 +836,6 @@ private fun PlatformSpecificContent(
                 Spacer(Modifier.height(16.dp))
             }
         }
-    }
-}
-
 }
 
 @Composable
