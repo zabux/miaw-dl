@@ -316,8 +316,7 @@ private fun MediaDownloadRow(
     var isDownloading by remember { mutableStateOf(false) }
     var isCompleted by remember { mutableStateOf(false) }
     var isPreparing by remember { mutableStateOf(false) }
-    var downloadedFileUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var downloadedMimeType by remember { mutableStateOf<String?>(null) }
+    var downloadedDownloadId by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(downloadId) {
         val id = downloadId ?: return@LaunchedEffect
@@ -326,12 +325,17 @@ private fun MediaDownloadRow(
         var downloading = true
         while (downloading) {
             val cursor = dm.query(DownloadManager.Query().setFilterById(id))
-            if (cursor != null && cursor.moveToFirst()) {
+            try {
+                // Row may be absent right after enqueue — keep polling instead of giving up.
+                if (cursor == null || !cursor.moveToFirst()) {
+                    kotlinx.coroutines.delay(200)
+                    continue
+                }
                 val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                val status = cursor.getInt(statusIndex)
                 val downloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
                 val totalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                
+                val status = if (statusIndex != -1) cursor.getInt(statusIndex) else DownloadManager.STATUS_PENDING
+
                 if (downloadedIndex != -1 && totalIndex != -1) {
                     val downloaded = cursor.getLong(downloadedIndex)
                     val total = cursor.getLong(totalIndex)
@@ -339,32 +343,23 @@ private fun MediaDownloadRow(
                         progress = downloaded.toFloat() / total.toFloat()
                     }
                 }
-                
+
                 if (status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED) {
                     downloading = false
                     isDownloading = false
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
                         progress = 1f
                         isCompleted = true
-                        // Get the URI and MIME type from DownloadManager
-                        val localUriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
+                        downloadedDownloadId = id
                         val mimeIndex = cursor.getColumnIndex(DownloadManager.COLUMN_MEDIA_TYPE)
-                        val localUri = if (localUriIndex != -1) cursor.getString(localUriIndex) else null
                         val mime = if (mimeIndex != -1) cursor.getString(mimeIndex) else null
-                        if (localUri != null) {
-                            downloadedFileUri = android.net.Uri.parse(localUri)
-                        }
                         val finalMime = mime?.takeIf { it.isNotBlank() } ?: guessMimeFromUrl(url, label)
-                        downloadedMimeType = finalMime
-                        // Trigger onSuccess only when download is completed successfully
-                        onSuccess(localUri ?: "", finalMime, url, detectMediaType(url, label))
+                        onSuccess(id.toString(), finalMime, url, detectMediaType(url, label))
                     }
                 }
-            } else {
-                downloading = false
-                isDownloading = false
+            } finally {
+                cursor?.close()
             }
-            cursor?.close()
             if (downloading) kotlinx.coroutines.delay(200)
         }
     }
@@ -397,12 +392,12 @@ private fun MediaDownloadRow(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
-                } else if (isCompleted && downloadedFileUri != null) {
+                } else if (isCompleted && downloadedDownloadId != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // "Buka" button — opens in system gallery/player
+                        // "Buka" button — hands off to DownloadManager, which owns the file
                         Button(
                             onClick = {
-                                openFileInGallery(context, downloadedFileUri.toString(), downloadedMimeType ?: "video/*")
+                                downloadedDownloadId?.let { openDownloadedFile(context, it) }
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier.height(34.dp),
@@ -1144,6 +1139,8 @@ private fun PlatformSelectionModal(
 @Composable
 fun MainScreen() {
     val api = remember { BtchDownloader() }
+    // remember{} never releases the client on activity recreation — close it explicitly.
+    DisposableEffect(Unit) { onDispose { api.close() } }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
@@ -1426,7 +1423,9 @@ fun MainScreen() {
                                                  }
                                              }
                                              if (targetUri.isNotEmpty()) {
-                                                 openFileInGallery(context, targetUri, targetMime)
+                                                 // localUri is now a DownloadManager id, not a file URI.
+                                                 targetUri.toLongOrNull()?.let { openDownloadedFile(context, it) }
+                                                     ?: openFileInGallery(context, targetUri, targetMime)
                                              } else {
                                                  url = selectedItem.sourceUrl
                                                  autoDetectPlatform(selectedItem.sourceUrl)?.let { detected -> selectedPlatform = detected }
@@ -1769,6 +1768,16 @@ private fun getPlatformColor(platform: String, defaultColor: Color): Color {
         "spotify" -> Color(0xFF1DB954)
         "soundcloud" -> Color(0xFFFF5500)
         else -> defaultColor
+    }
+}
+
+private fun openDownloadedFile(context: Context, downloadId: Long) {
+    val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    try {
+        dm.openDownloadedFile(downloadId)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        Toast.makeText(context, "File tidak bisa dibuka", Toast.LENGTH_SHORT).show()
     }
 }
 
