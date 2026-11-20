@@ -290,7 +290,8 @@ private suspend fun saveFile(context: Context, url: String, suggestedName: Strin
         .setAllowedOverMetered(true)
         .setAllowedOverRoaming(true)
     
-    mimeType?.let { request.setMimeType(it) }
+    // Wildcard MIME from the server makes DownloadManager skip extensions; only pass concrete types.
+    mimeType?.takeIf { it.contains('/') && !it.endsWith("/*") }?.let { request.setMimeType(it) }
     
     return try {
         dm.enqueue(request)
@@ -1417,9 +1418,9 @@ fun MainScreen() {
                                              val targetUri = if (selectedItem.localUri.isNotEmpty()) selectedItem.localUri else selectedItem.mediaUrl
                                              val targetMime = if (selectedItem.mimeType.isNotEmpty()) selectedItem.mimeType else {
                                                  when (selectedItem.mediaType) {
-                                                     "audio" -> "audio/*"
-                                                     "image" -> "image/*"
-                                                     else -> "video/*"
+                                                     "audio" -> "audio/mpeg"
+                                                     "image" -> "image/jpeg"
+                                                     else -> "video/mp4"
                                                  }
                                              }
                                              if (targetUri.isNotEmpty()) {
@@ -1773,18 +1774,52 @@ private fun getPlatformColor(platform: String, defaultColor: Color): Color {
 
 private fun openDownloadedFile(context: Context, downloadId: Long) {
     val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-    try {
-        dm.openDownloadedFile(downloadId)
+    val uri = try {
+        dm.getUriForDownloadedFile(downloadId)
     } catch (e: Exception) {
+        null
+    }
+    if (uri == null) {
+        Toast.makeText(context, "File tidak ditemukan, coba unduh ulang", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val mime = try {
+        dm.getMimeTypeForDownloadedFile(downloadId)?.takeIf { it.isNotBlank() }
+    } catch (e: Exception) {
+        null
+    } ?: "*/*"
+    launchViewer(context, uri, mime)
+}
+
+/** Fire ACTION_VIEW at whatever app the device registered for this MIME. */
+private fun launchViewer(context: Context, uri: android.net.Uri, mimeType: String) {
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (e: android.content.ActivityNotFoundException) {
         e.printStackTrace()
-        Toast.makeText(context, "File tidak bisa dibuka", Toast.LENGTH_SHORT).show()
+        // No player installed for this MIME — let the chooser offer everything.
+        val fallback = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "*/*")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(fallback)
+        } catch (e2: Exception) {
+            Toast.makeText(context, "Tidak ada aplikasi untuk membuka file ini", Toast.LENGTH_SHORT).show()
+        }
     }
 }
 
 private fun openFileInGallery(context: Context, localUriStr: String, mimeType: String) {
     try {
         val uri = android.net.Uri.parse(localUriStr)
-        val fileUri = if (uri.scheme == "file") {
+        val viewUri = if (uri.scheme == "file") {
             val file = java.io.File(uri.path ?: "")
             androidx.core.content.FileProvider.getUriForFile(
                 context,
@@ -1794,13 +1829,7 @@ private fun openFileInGallery(context: Context, localUriStr: String, mimeType: S
         } else {
             uri
         }
-        
-        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-            setDataAndType(fileUri, mimeType)
-            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
+        launchViewer(context, viewUri, mimeType)
     } catch (e: Exception) {
         e.printStackTrace()
         Toast.makeText(context, "Tidak ada aplikasi untuk membuka file ini", Toast.LENGTH_SHORT).show()
@@ -1829,18 +1858,19 @@ private fun guessMimeFromUrl(url: String, label: String): String {
         cleanUrl.endsWith(".m4a") -> "audio/mp4"
         cleanUrl.endsWith(".wav") -> "audio/wav"
         cleanUrl.endsWith(".ogg") -> "audio/ogg"
-        cleanLabel.contains("audio") || cleanLabel.contains("music") || cleanLabel.contains("mp3") -> "audio/*"
+        cleanLabel.contains("audio") || cleanLabel.contains("music") || cleanLabel.contains("mp3") -> "audio/mpeg"
         
         cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg") -> "image/jpeg"
         cleanUrl.endsWith(".png") -> "image/png"
         cleanUrl.endsWith(".webp") -> "image/webp"
         cleanUrl.endsWith(".gif") -> "image/gif"
-        cleanLabel.contains("image") || cleanLabel.contains("photo") || cleanLabel.contains("thumbnail") || cleanLabel.contains("thumb") -> "image/*"
+        cleanLabel.contains("image") || cleanLabel.contains("photo") || cleanLabel.contains("thumbnail") || cleanLabel.contains("thumb") -> "image/jpeg"
         
         cleanUrl.endsWith(".mp4") -> "video/mp4"
         cleanUrl.endsWith(".mkv") -> "video/x-matroska"
         cleanUrl.endsWith(".webm") -> "video/webm"
-        else -> "video/*"
+        // Concrete type: "video/*" is not a valid ACTION_VIEW type and many players reject it.
+        else -> "video/mp4"
     }
 }
 
