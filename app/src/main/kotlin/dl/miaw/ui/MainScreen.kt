@@ -247,10 +247,10 @@ private fun sanitizeFilename(name: String): String {
     return finalName.ifEmpty { "media" }
 }
 
-private suspend fun saveFile(context: Context, url: String, suggestedName: String? = null): Long {
+private suspend fun saveFile(context: Context, url: String, suggestedName: String? = null): Pair<Long, String?> {
     val cleanUrl = url.replace("&amp;", "&")
     
-    val (guessedName, mimeType) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    val (guessedName, serverMime) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         var finalName = suggestedName
         var mime: String? = null
         try {
@@ -290,15 +290,19 @@ private suspend fun saveFile(context: Context, url: String, suggestedName: Strin
         .setAllowedOverMetered(true)
         .setAllowedOverRoaming(true)
     
-    // Wildcard MIME from the server makes DownloadManager skip extensions; only pass concrete types.
-    mimeType?.takeIf { it.contains('/') && !it.endsWith("/*") }?.let { request.setMimeType(it) }
+    // Strip parameters ("; charset=...") and reject wildcards: DownloadManager skips
+    // extension guessing for "audio/*" and friends, so pass only concrete types.
+    val concreteMime = serverMime?.substringBefore(';')?.trim()
+        ?.takeIf { it.contains('/') && !it.endsWith("/*") }
+    concreteMime?.let { request.setMimeType(it) }
     
-    return try {
+    val id = try {
         dm.enqueue(request)
     } catch (e: Exception) {
         e.printStackTrace()
         -1L
     }
+    return Pair(id, concreteMime)
 }
 
 
@@ -307,7 +311,7 @@ private suspend fun saveFile(context: Context, url: String, suggestedName: Strin
 private fun MediaDownloadRow(
     label: String,
     url: String,
-    onDownload: suspend () -> Long,
+    onDownload: suspend () -> Pair<Long, String?>,
     onSuccess: (String, String, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
@@ -318,6 +322,8 @@ private fun MediaDownloadRow(
     var isCompleted by remember { mutableStateOf(false) }
     var isPreparing by remember { mutableStateOf(false) }
     var downloadedDownloadId by remember { mutableStateOf<Long?>(null) }
+    // MIME reported by the server during the HEAD probe; most reliable media-type signal.
+    var serverMime by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(downloadId) {
         val id = downloadId ?: return@LaunchedEffect
@@ -354,8 +360,10 @@ private fun MediaDownloadRow(
                         downloadedDownloadId = id
                         val mimeIndex = cursor.getColumnIndex(DownloadManager.COLUMN_MEDIA_TYPE)
                         val mime = if (mimeIndex != -1) cursor.getString(mimeIndex) else null
-                        val finalMime = mime?.takeIf { it.isNotBlank() } ?: guessMimeFromUrl(url, label)
-                        onSuccess(id.toString(), finalMime, url, detectMediaType(url, label))
+                        val finalMime = mime?.substringBefore(';')?.trim()?.takeIf { it.contains('/') && !it.endsWith("/*") }
+                            ?: serverMime
+                            ?: guessMimeFromUrl(url, label)
+                        onSuccess(id.toString(), finalMime, url, mediaCategory(finalMime))
                     }
                 }
             } finally {
@@ -413,8 +421,9 @@ private fun MediaDownloadRow(
                             AnalyticsManager.trackEvent("Download_Media", mapOf("label" to label))
                             scope.launch { 
                                 isPreparing = true
-                                val id = onDownload()
+                                val (id, mime) = onDownload()
                                 isPreparing = false
+                                serverMime = mime
                                 if (id != -1L) {
                                     downloadId = id
                                 }
@@ -1836,41 +1845,44 @@ private fun openFileInGallery(context: Context, localUriStr: String, mimeType: S
     }
 }
 
-private fun detectMediaType(url: String, label: String): String {
-    val cleanUrl = url.lowercase()
-    val cleanLabel = label.lowercase()
-    return when {
-        cleanUrl.endsWith(".mp3") || cleanUrl.endsWith(".m4a") || cleanUrl.endsWith(".wav") || cleanUrl.endsWith(".ogg") ||
-        cleanLabel.contains("audio") || cleanLabel.contains("music") || cleanLabel.contains("mp3") -> "audio"
-        
-        cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg") || cleanUrl.endsWith(".png") || cleanUrl.endsWith(".webp") || cleanUrl.endsWith(".gif") ||
-        cleanLabel.contains("image") || cleanLabel.contains("photo") || cleanLabel.contains("thumbnail") || cleanLabel.contains("thumb") -> "image"
-        
-        else -> "video"
-    }
-}
-
+/**
+ * Guess a concrete MIME type from the URL path and the UI label.
+ * Prefer [DownloadManager.COLUMN_MEDIA_TYPE] when available — the server's
+ * Content-Type beats any guess, which is why TikTok CDN URLs (no extension)
+ * fall back to the label.
+ */
 private fun guessMimeFromUrl(url: String, label: String): String {
-    val cleanUrl = url.lowercase()
+    val path = url.lowercase().substringBefore('?')
     val cleanLabel = label.lowercase()
     return when {
-        cleanUrl.endsWith(".mp3") -> "audio/mpeg"
-        cleanUrl.endsWith(".m4a") -> "audio/mp4"
-        cleanUrl.endsWith(".wav") -> "audio/wav"
-        cleanUrl.endsWith(".ogg") -> "audio/ogg"
+        path.endsWith(".mp3") -> "audio/mpeg"
+        path.endsWith(".m4a") -> "audio/mp4"
+        path.endsWith(".wav") -> "audio/wav"
+        path.endsWith(".ogg") || path.endsWith(".opus") -> "audio/ogg"
+        path.endsWith(".aac") -> "audio/aac"
+        path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
+        path.endsWith(".png") -> "image/png"
+        path.endsWith(".webp") -> "image/webp"
+        path.endsWith(".gif") -> "image/gif"
+        path.endsWith(".heic") -> "image/heic"
+        path.endsWith(".mp4") -> "video/mp4"
+        path.endsWith(".mkv") -> "video/x-matroska"
+        path.endsWith(".webm") -> "video/webm"
+        path.endsWith(".mov") -> "video/quicktime"
         cleanLabel.contains("audio") || cleanLabel.contains("music") || cleanLabel.contains("mp3") -> "audio/mpeg"
-        
-        cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg") -> "image/jpeg"
-        cleanUrl.endsWith(".png") -> "image/png"
-        cleanUrl.endsWith(".webp") -> "image/webp"
-        cleanUrl.endsWith(".gif") -> "image/gif"
-        cleanLabel.contains("image") || cleanLabel.contains("photo") || cleanLabel.contains("thumbnail") || cleanLabel.contains("thumb") -> "image/jpeg"
-        
-        cleanUrl.endsWith(".mp4") -> "video/mp4"
-        cleanUrl.endsWith(".mkv") -> "video/x-matroska"
-        cleanUrl.endsWith(".webm") -> "video/webm"
+        cleanLabel.contains("image") || cleanLabel.contains("photo") ||
+            cleanLabel.contains("thumbnail") || cleanLabel.contains("thumb") ||
+            cleanLabel.contains("cover") -> "image/jpeg"
         // Concrete type: "video/*" is not a valid ACTION_VIEW type and many players reject it.
         else -> "video/mp4"
     }
 }
+
+/** Map a MIME type to the history media category used for icons and fallbacks. */
+private fun mediaCategory(mime: String): String = when {
+    mime.startsWith("audio/") -> "audio"
+    mime.startsWith("image/") -> "image"
+    else -> "video"
+}
+
 
